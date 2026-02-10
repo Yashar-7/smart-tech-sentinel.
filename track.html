@@ -95,16 +95,16 @@
         }
         .beacon-btn:active { transform: scale(0.97); }
         .beacon-btn.transmitting {
-            border-color: var(--neon-cyan);
-            color: var(--neon-cyan);
-            background: radial-gradient(circle at 35% 35%, rgba(0, 242, 255, 0.12), var(--dark-bg));
-            box-shadow: 0 0 40px rgba(0, 242, 255, 0.3), inset 0 0 50px rgba(0, 242, 255, 0.06);
-            animation: beacon-cyan-pulse 1.8s ease-in-out infinite;
+            border-color: #00ff88;
+            color: #00ff88;
+            background: radial-gradient(circle at 35% 35%, rgba(0, 255, 136, 0.15), var(--dark-bg));
+            box-shadow: 0 0 40px rgba(0, 255, 136, 0.4), inset 0 0 50px rgba(0, 255, 136, 0.08);
+            animation: beacon-green-blink 1.2s ease-in-out infinite;
         }
-        .beacon-btn.transmitting .sentinel-logo { opacity: 1; filter: drop-shadow(0 0 8px var(--neon-cyan)); }
-        @keyframes beacon-cyan-pulse {
-            0%, 100% { box-shadow: 0 0 40px rgba(0, 242, 255, 0.3), inset 0 0 50px rgba(0, 242, 255, 0.06); }
-            50% { box-shadow: 0 0 60px rgba(0, 242, 255, 0.5), inset 0 0 70px rgba(0, 242, 255, 0.1); }
+        .beacon-btn.transmitting .sentinel-logo { opacity: 1; filter: drop-shadow(0 0 8px #00ff88); }
+        @keyframes beacon-green-blink {
+            0%, 100% { box-shadow: 0 0 40px rgba(0, 255, 136, 0.4), inset 0 0 50px rgba(0, 255, 136, 0.08); opacity: 1; }
+            50% { box-shadow: 0 0 60px rgba(0, 255, 136, 0.7), inset 0 0 70px rgba(0, 255, 136, 0.12); opacity: 0.92; }
         }
         .beacon-btn .btn-label { font-size: clamp(0.85rem, 2.8vw, 1rem); }
         .beacon-live {
@@ -140,7 +140,7 @@
                     <circle cx="40" cy="40" r="18" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="6 5"/>
                     <circle cx="40" cy="40" r="6" fill="currentColor"/>
                 </svg>
-                <span class="btn-label" id="beacon-btn-label">OFF</span>
+                <span class="btn-label" id="beacon-btn-label">ACTIVAR BALIZA</span>
             </button>
         </div>
         <div id="beacon-msg" class="beacon-msg"></div>
@@ -270,15 +270,7 @@
                 supabase.from('unidades_live').upsert(row, { onConflict: 'id' }).then(function () {});
             }
 
-            function startBeacon() {
-                if (watchId != null) return;
-                msgEl.textContent = '';
-                statusEl.textContent = 'Obteniendo posición...';
-                latEl.textContent = '—';
-                lngEl.textContent = '—';
-                precisionEl.textContent = '—';
-                precisionEl.className = 'value';
-
+            function startWatchPosition() {
                 try {
                     watchId = navigator.geolocation.watchPosition(
                         function (pos) {
@@ -303,15 +295,28 @@
                     statusEl.textContent = 'Error: ' + (e.message || 'GPS no disponible');
                     statusEl.style.color = '#ff4444';
                     sendGpsErrorToWarRoom();
-                    return;
+                    return false;
                 }
+                return true;
+            }
+
+            function startBeacon() {
+                if (watchId != null) return;
+                msgEl.textContent = '';
+                statusEl.textContent = 'Obteniendo posición...';
+                latEl.textContent = '—';
+                lngEl.textContent = '—';
+                precisionEl.textContent = '—';
+                precisionEl.className = 'value';
+
+                if (!startWatchPosition()) return;
 
                 sendPositionOnce();
                 intervalId = setInterval(sendPositionOnce, BEACON_INTERVAL_MS);
                 requestWakeLock();
 
                 btn.classList.add('transmitting');
-                btnLabel.textContent = 'TRANSMITIENDO';
+                btnLabel.textContent = 'BALIZA TRANSMITIENDO';
                 msgEl.textContent = '[ TRANSMITIDOR ACTIVO - BAJO PROTECCIÓN SENTINEL ]';
                 msgEl.classList.add('active');
             }
@@ -341,7 +346,7 @@
                 }
                 releaseWakeLock();
                 btn.classList.remove('transmitting');
-                btnLabel.textContent = 'OFF';
+                btnLabel.textContent = 'ACTIVAR BALIZA';
                 msgEl.textContent = '';
                 msgEl.classList.remove('active');
                 statusEl.textContent = '';
@@ -353,16 +358,25 @@
             }
 
             btn.addEventListener('click', function () {
-                if (btn.classList.contains('transmitting')) stopBeacon();
-                else startBeacon();
+                if (btn.classList.contains('transmitting')) {
+                    stopBeacon();
+                    return;
+                }
+                // Despertar GPS: primero getCurrentPosition para forzar el permiso en móvil, luego watchPosition
+                statusEl.textContent = 'Solicitando permiso de ubicación...';
+                statusEl.style.color = '';
+                navigator.geolocation.getCurrentPosition(
+                    function () {
+                        startBeacon();
+                    },
+                    function (err) {
+                        statusEl.textContent = 'Error: ' + (err.message || 'Permiso denegado');
+                        statusEl.style.color = '#ff4444';
+                        sendGpsErrorToWarRoom();
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+                );
             });
-
-            // Auto-activación: iniciar GPS en cuanto cargue la página
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', function () { startBeacon(); });
-            } else {
-                startBeacon();
-            }
         })();
     </script>
 </body>
