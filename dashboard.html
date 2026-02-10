@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>CORE Control Center - Smart Tech</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -198,10 +198,33 @@
             }
             .top-bar-baliza { display: none !important; }
             .top-bar { display: none; }
-            .main-wrap { flex: 1; min-height: 0; }
-            .map-sentinel-wrap { flex: 1; min-height: 0; }
+            .main-wrap {
+                flex: 1;
+                min-height: 0;
+                width: 100%;
+            }
+            .app-dashboard header {
+                flex-shrink: 0;
+                padding: 8px 12px;
+            }
+            .app-dashboard header h2 { font-size: 0.95rem; }
+            .app-dashboard header small { display: none; }
+            .map-sentinel-wrap {
+                flex: 1;
+                min-height: 0;
+                width: 100%;
+                height: 100%;
+            }
+            .map-sentinel-wrap #map {
+                width: 100% !important;
+                height: 100% !important;
+                min-height: 100%;
+            }
             .mission-log { display: none; }
-            .app-dashboard { height: 100vh; height: 100dvh; }
+            .app-dashboard { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+            /* Cuadrícula cyberpunk más fina en vertical para no romper estética */
+            .map-grid-overlay { background-size: 24px 24px; }
+            body::after { background-size: 100% 80px; }
         }
         /* Deformación esférica leve — pantalla curva */
         .main-wrap {
@@ -2464,6 +2487,40 @@
     const map = L.map('map', { zoomControl: false }).setView([-37.994, -57.553], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // GPS Realtime: activar onload, enviar cada cambio de posición a Supabase (tabla locations)
+    var gpsWatchId = null;
+    function startGpsRealtime() {
+        if (!navigator.geolocation) {
+            console.warn('GPS_SIGNAL_LOST');
+            return;
+        }
+        try {
+            gpsWatchId = navigator.geolocation.watchPosition(
+                function (pos) {
+                    var lat = pos.coords.latitude;
+                    var lng = pos.coords.longitude;
+                    var accuracy = pos.coords.accuracy != null ? pos.coords.accuracy : null;
+                    supabaseClient.auth.getSession().then(function (r) {
+                        var session = r.data && r.data.session;
+                        var payload = { latitude: lat, longitude: lng };
+                        if (accuracy != null) payload.accuracy = accuracy;
+                        if (session && session.user) payload.user_id = session.user.id;
+                        supabaseClient.from('locations').insert([payload]).then(function (res) {
+                            if (res.error) console.warn('locations insert:', res.error.message);
+                        });
+                    });
+                },
+                function (err) {
+                    console.log('GPS_SIGNAL_LOST');
+                },
+                { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+            );
+        } catch (e) {
+            console.log('GPS_SIGNAL_LOST');
+        }
+    }
+    startGpsRealtime();
 
     // The Grid: actualizar coordenadas en bordes al mover el mapa
     function updateGridCoords() {
