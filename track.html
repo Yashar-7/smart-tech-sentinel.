@@ -154,8 +154,9 @@
     </div>
     <script>
         (function () {
-            var SUPABASE_URL = 'https://svpurpvbiujhcbiugrkh.supabase.co';
-            var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2cHVycHZiaXVqaGNiaXVncmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NDgzMTUsImV4cCI6MjA4MzMyNDMxNX0.AivKJ0_N0z_4T4vLNfUcE2hepJ1XXOO8-4fSA3PJXdc';
+            // Credenciales Supabase (funcionan en producción; para Vite usar: import.meta.env.VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)
+            var SUPABASE_URL = typeof window !== 'undefined' && window.__CORE_SUPABASE_URL__ ? window.__CORE_SUPABASE_URL__ : 'https://svpurpvbiujhcbiugrkh.supabase.co';
+            var SUPABASE_KEY = typeof window !== 'undefined' && window.__CORE_SUPABASE_ANON_KEY__ ? window.__CORE_SUPABASE_ANON_KEY__ : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2cHVycHZiaXVqaGNiaXVncmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NDgzMTUsImV4cCI6MjA4MzMyNDMxNX0.AivKJ0_N0z_4T4vLNfUcE2hepJ1XXOO8-4fSA3PJXdc';
             var supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
             var btn = document.getElementById('beacon-btn');
@@ -171,6 +172,7 @@
             var intervalId = null;
             var beaconId = null;
             var beaconName = 'Baliza Móvil';
+            var isAdmin = false;
             var wakeLock = null;
 
             function getBeaconId() {
@@ -189,7 +191,8 @@
                     var session = r.data && r.data.session;
                     if (session && session.user) {
                         beaconId = session.user.id;
-                        beaconName = session.user.email || 'Unidad Móvil';
+                        beaconName = session.user.email || 'Administrador';
+                        isAdmin = true;
                     } else {
                         getBeaconId();
                     }
@@ -244,7 +247,7 @@
                 var id = beaconId || getBeaconId();
                 getBatteryPct(function (batt) {
                     getSignalBars(function (sig) {
-                        var row = { id: id, name: beaconName, lat: lat, lng: lng, status: 'active' };
+                        var row = { id: id, name: beaconName, lat: lat, lng: lng, status: isAdmin ? 'admin' : 'active' };
                         if (batt != null) row.battery_pct = batt;
                         if (sig != null) row.signal_bars = sig;
                         supabase.from('unidades_live').upsert(row, { onConflict: 'id' }).then(function (res) {
@@ -253,6 +256,18 @@
                         });
                     });
                 });
+            }
+
+            function sendGpsErrorToWarRoom() {
+                var id = beaconId || getBeaconId();
+                var row = {
+                    id: id,
+                    name: 'ERROR: GPS BEACON NOT FOUND. PLEASE ENABLE LOCATION',
+                    lat: null,
+                    lng: null,
+                    status: 'gps_error'
+                };
+                supabase.from('unidades_live').upsert(row, { onConflict: 'id' }).then(function () {});
             }
 
             function startBeacon() {
@@ -264,24 +279,32 @@
                 precisionEl.textContent = '—';
                 precisionEl.className = 'value';
 
-                watchId = navigator.geolocation.watchPosition(
-                    function (pos) {
-                        var lat = pos.coords.latitude;
-                        var lng = pos.coords.longitude;
-                        var acc = pos.coords.accuracy;
-                        latEl.textContent = lat.toFixed(5);
-                        lngEl.textContent = lng.toFixed(5);
-                        var p = precisionLabel(acc);
-                        precisionEl.textContent = p.text;
-                        precisionEl.className = 'value ' + p.cls;
-                        sendPosition(lat, lng, acc);
-                    },
-                    function (err) {
-                        statusEl.textContent = 'Error: ' + (err.message || 'denegado');
-                        statusEl.style.color = '#ff4444';
-                    },
-                    { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
-                );
+                try {
+                    watchId = navigator.geolocation.watchPosition(
+                        function (pos) {
+                            var lat = pos.coords.latitude;
+                            var lng = pos.coords.longitude;
+                            var acc = pos.coords.accuracy;
+                            latEl.textContent = lat.toFixed(5);
+                            lngEl.textContent = lng.toFixed(5);
+                            var p = precisionLabel(acc);
+                            precisionEl.textContent = p.text;
+                            precisionEl.className = 'value ' + p.cls;
+                            sendPosition(lat, lng, acc);
+                        },
+                        function (err) {
+                            statusEl.textContent = 'Error: ' + (err.message || 'denegado');
+                            statusEl.style.color = '#ff4444';
+                            sendGpsErrorToWarRoom();
+                        },
+                        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+                    );
+                } catch (e) {
+                    statusEl.textContent = 'Error: ' + (e.message || 'GPS no disponible');
+                    statusEl.style.color = '#ff4444';
+                    sendGpsErrorToWarRoom();
+                    return;
+                }
 
                 sendPositionOnce();
                 intervalId = setInterval(sendPositionOnce, BEACON_INTERVAL_MS);
@@ -333,6 +356,13 @@
                 if (btn.classList.contains('transmitting')) stopBeacon();
                 else startBeacon();
             });
+
+            // Auto-activación: iniciar GPS en cuanto cargue la página
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function () { startBeacon(); });
+            } else {
+                startBeacon();
+            }
         })();
     </script>
 </body>

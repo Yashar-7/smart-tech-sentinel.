@@ -819,6 +819,16 @@
             box-shadow: 0 0 15px var(--alert-red);
             animation: pulse-red 1.2s ease-in-out infinite;
         }
+        /* Administrador: rojo neón parpadeante */
+        .marker-velo-wrap .marker-dot.marker-icon-admin {
+            background: rgba(255, 0, 64, 0.7); border-color: #ff0040;
+            box-shadow: 0 0 18px #ff0040, 0 0 30px rgba(255, 0, 64, 0.6);
+            animation: admin-neon-blink 1s ease-in-out infinite;
+        }
+        @keyframes admin-neon-blink {
+            0%, 100% { opacity: 1; box-shadow: 0 0 18px #ff0040, 0 0 30px rgba(255, 0, 64, 0.6); filter: brightness(1.2); }
+            50% { opacity: 0.85; box-shadow: 0 0 28px #ff0040, 0 0 45px rgba(255, 0, 64, 0.9); filter: brightness(1.5); }
+        }
         /* Estela de dirección en iconos patrulla (puntos azules) */
         .marker-velo-wrap .marker-dot.marker-icon-normal::after,
         .marker-velo-wrap .marker-dot.marker-icon-speed::after {
@@ -2889,11 +2899,13 @@
     }
     function getIconForUnidadLive(status) {
         var s = (status || '').toLowerCase();
-        var state = (s.indexOf('alert') >= 0 || s.indexOf('alerta') >= 0) ? 'alert' : (s.indexOf('speed') >= 0 || s.indexOf('velocidad') >= 0 || s.indexOf('high') >= 0) ? 'speed' : 'normal';
-        var dotClass = state === 'alert' ? 'marker-icon-alert' : (state === 'speed' ? 'marker-icon-speed' : 'marker-icon-normal');
-        var html = '<div class="marker-velo-wrap"><span class="speed-label-floating">' + (status || '—') + '</span><div class="marker-dot ' + dotClass + '"></div></div>';
+        var isAdmin = s === 'admin';
+        var state = isAdmin ? 'admin' : (s.indexOf('alert') >= 0 || s.indexOf('alerta') >= 0) ? 'alert' : (s.indexOf('speed') >= 0 || s.indexOf('velocidad') >= 0 || s.indexOf('high') >= 0) ? 'speed' : 'normal';
+        var dotClass = state === 'admin' ? 'marker-icon-admin' : (state === 'alert' ? 'marker-icon-alert' : (state === 'speed' ? 'marker-icon-speed' : 'marker-icon-normal'));
+        var label = isAdmin ? 'ADMIN' : (status || '—');
+        var html = '<div class="marker-velo-wrap"><span class="speed-label-floating">' + label + '</span><div class="marker-dot ' + dotClass + '"></div></div>';
         return L.divIcon({
-            className: 'marker-velo-container',
+            className: 'marker-velo-container' + (isAdmin ? ' marker-admin-blink' : ''),
             html: html,
             iconSize: [40, 48],
             iconAnchor: [20, 42]
@@ -2901,6 +2913,12 @@
     }
     function syncUnidadLiveToMap(row) {
         var id = row.id;
+        var status = (row.status || '').toLowerCase();
+        if (status === 'gps_error') {
+            appendMissionLog(row.name || 'ERROR: GPS BEACON NOT FOUND. PLEASE ENABLE LOCATION', true);
+            removeUnidadLiveFromMap(id);
+            return;
+        }
         var lat = row.lat != null ? Number(row.lat) : null;
         var lng = row.lng != null ? Number(row.lng) : null;
         if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) return;
