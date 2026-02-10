@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#050508">
+    <title>Baliza Sentinel — CORE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --neon-cyan: #00f2ff;
+            --dark-bg: #050508;
+            --gray-off: #2a2a2e;
+        }
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            min-height: 100dvh;
+            background: var(--dark-bg);
+            color: var(--neon-cyan);
+            font-family: 'VT323', 'JetBrains Mono', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0, 242, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
+            background-size: 24px 24px;
+            pointer-events: none;
+        }
+        .track-wrap {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 420px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .track-title {
+            font-size: clamp(1rem, 4vw, 1.2rem);
+            letter-spacing: 4px;
+            color: rgba(0, 242, 255, 0.85);
+            text-align: center;
+        }
+        .beacon-btn-wrap {
+            position: relative;
+            width: min(200px, 72vw);
+            height: min(200px, 72vw);
+            min-width: 160px;
+            min-height: 160px;
+        }
+        .beacon-btn {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 4px solid var(--gray-off);
+            background: radial-gradient(circle at 35% 35%, #1a1a1e, var(--dark-bg));
+            color: #666;
+            font-family: 'VT323', 'JetBrains Mono', monospace;
+            font-size: clamp(0.9rem, 3.2vw, 1rem);
+            letter-spacing: 2px;
+            text-align: center;
+            line-height: 1.2;
+            padding: 16px;
+            cursor: pointer;
+            transition: border-color 0.3s, box-shadow 0.3s, transform 0.15s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .beacon-btn .sentinel-logo {
+            width: 48%;
+            height: auto;
+            max-width: 80px;
+            opacity: 0.6;
+        }
+        .beacon-btn:active { transform: scale(0.97); }
+        .beacon-btn.transmitting {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            background: radial-gradient(circle at 35% 35%, rgba(0, 242, 255, 0.12), var(--dark-bg));
+            box-shadow: 0 0 40px rgba(0, 242, 255, 0.3), inset 0 0 50px rgba(0, 242, 255, 0.06);
+            animation: beacon-cyan-pulse 1.8s ease-in-out infinite;
+        }
+        .beacon-btn.transmitting .sentinel-logo { opacity: 1; filter: drop-shadow(0 0 8px var(--neon-cyan)); }
+        @keyframes beacon-cyan-pulse {
+            0%, 100% { box-shadow: 0 0 40px rgba(0, 242, 255, 0.3), inset 0 0 50px rgba(0, 242, 255, 0.06); }
+            50% { box-shadow: 0 0 60px rgba(0, 242, 255, 0.5), inset 0 0 70px rgba(0, 242, 255, 0.1); }
+        }
+        .beacon-btn .btn-label { font-size: clamp(0.85rem, 2.8vw, 1rem); }
+        .beacon-live {
+            width: 100%;
+            max-width: 320px;
+            padding: 14px 18px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(0, 242, 255, 0.25);
+            border-radius: 6px;
+        }
+        .beacon-live .row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 1rem; }
+        .beacon-live .row:last-child { margin-bottom: 0; }
+        .beacon-live .label { color: #666; }
+        .beacon-live .value { color: var(--neon-cyan); letter-spacing: 1px; }
+        .beacon-live .value.good { color: #00ff88; }
+        .beacon-live .value.warn { color: #ffaa00; }
+        .beacon-live .value.bad { color: #ff4444; }
+        .beacon-msg { min-height: 2.2em; text-align: center; font-size: clamp(0.9rem, 2.6vw, 1rem); letter-spacing: 2px; color: rgba(0, 242, 255, 0.6); }
+        .beacon-msg.active { color: var(--neon-cyan); text-shadow: 0 0 16px rgba(0, 242, 255, 0.6); }
+        .beacon-status { font-size: 0.85rem; color: #555; text-align: center; }
+        .track-link { margin-top: 8px; font-size: 1rem; }
+        .track-link a { color: rgba(0, 242, 255, 0.85); text-decoration: none; padding: 12px 20px; display: inline-block; }
+        .track-link a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="track-wrap">
+        <div class="track-title">[ THE BEACON ]</div>
+        <div class="beacon-btn-wrap">
+            <button type="button" id="beacon-btn" class="beacon-btn" aria-label="Activar o desactivar baliza">
+                <svg class="sentinel-logo" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M 14 40 A 26 22 0 0 1 66 40 M 14 40 A 26 22 0 0 0 66 40" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="40" cy="40" r="18" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="6 5"/>
+                    <circle cx="40" cy="40" r="6" fill="currentColor"/>
+                </svg>
+                <span class="btn-label" id="beacon-btn-label">OFF</span>
+            </button>
+        </div>
+        <div id="beacon-msg" class="beacon-msg"></div>
+        <div class="beacon-live" id="beacon-live">
+            <div class="row"><span class="label">LAT</span><span class="value" id="beacon-lat">—</span></div>
+            <div class="row"><span class="label">LNG</span><span class="value" id="beacon-lng">—</span></div>
+            <div class="row"><span class="label">PRECISIÓN GPS</span><span class="value" id="beacon-precision">—</span></div>
+        </div>
+        <div id="beacon-status" class="beacon-status"></div>
+        <p class="track-link"><a href="dashboard.html">← War Room</a></p>
+    </div>
+    <script>
+        (function () {
+            var SUPABASE_URL = 'https://svpurpvbiujhcbiugrkh.supabase.co';
+            var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2cHVycHZiaXVqaGNiaXVncmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NDgzMTUsImV4cCI6MjA4MzMyNDMxNX0.AivKJ0_N0z_4T4vLNfUcE2hepJ1XXOO8-4fSA3PJXdc';
+            var supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+            var btn = document.getElementById('beacon-btn');
+            var btnLabel = document.getElementById('beacon-btn-label');
+            var msgEl = document.getElementById('beacon-msg');
+            var statusEl = document.getElementById('beacon-status');
+            var latEl = document.getElementById('beacon-lat');
+            var lngEl = document.getElementById('beacon-lng');
+            var precisionEl = document.getElementById('beacon-precision');
+
+            var BEACON_INTERVAL_MS = 8000;
+            var watchId = null;
+            var intervalId = null;
+            var beaconId = null;
+            var beaconName = 'Baliza Móvil';
+            var wakeLock = null;
+
+            function getBeaconId() {
+                if (beaconId) return beaconId;
+                try {
+                    var stored = localStorage.getItem('core_beacon_id');
+                    if (stored) { beaconId = stored; return beaconId; }
+                } catch (e) {}
+                beaconId = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/x/g, function () { return (Math.random() * 16 | 0).toString(16); });
+                try { localStorage.setItem('core_beacon_id', beaconId); } catch (e) {}
+                return beaconId;
+            }
+
+            function initUser() {
+                supabase.auth.getSession().then(function (r) {
+                    var session = r.data && r.data.session;
+                    if (session && session.user) {
+                        beaconId = session.user.id;
+                        beaconName = session.user.email || 'Unidad Móvil';
+                    } else {
+                        getBeaconId();
+                    }
+                });
+            }
+            initUser();
+
+            function requestWakeLock() {
+                if ('wakeLock' in navigator) {
+                    navigator.wakeLock.request('screen').then(function (wl) {
+                        wakeLock = wl;
+                    }).catch(function () {});
+                }
+            }
+            function releaseWakeLock() {
+                if (wakeLock) {
+                    wakeLock.release().catch(function () {});
+                    wakeLock = null;
+                }
+            }
+
+            var lastBatteryPct = null;
+            var lastSignalBars = 3;
+
+            function getBatteryPct(cb) {
+                if (navigator.getBattery) {
+                    navigator.getBattery().then(function (b) {
+                        lastBatteryPct = b.level != null ? Math.round(b.level * 100) : null;
+                        cb(lastBatteryPct);
+                    }).catch(function () { cb(lastBatteryPct); });
+                } else { cb(lastBatteryPct); }
+            }
+            function getSignalBars(cb) {
+                var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                if (conn) {
+                    var eff = (conn.effectiveType || '').toLowerCase();
+                    var bars = eff === '4g' ? 5 : eff === '3g' ? 4 : eff === '2g' ? 2 : conn.downlink > 2 ? 5 : conn.downlink > 1 ? 4 : conn.downlink > 0.5 ? 3 : 2;
+                    lastSignalBars = Math.min(5, Math.max(1, bars));
+                    cb(lastSignalBars);
+                } else { cb(lastSignalBars); }
+            }
+
+            function precisionLabel(accuracy) {
+                if (accuracy == null || isNaN(accuracy)) return { text: '—', cls: '' };
+                var m = Math.round(accuracy);
+                if (m <= 10) return { text: m + ' m (alta)', cls: 'good' };
+                if (m <= 50) return { text: m + ' m (media)', cls: 'warn' };
+                return { text: m + ' m (baja)', cls: 'bad' };
+            }
+
+            function sendPosition(lat, lng, accuracy) {
+                var id = beaconId || getBeaconId();
+                getBatteryPct(function (batt) {
+                    getSignalBars(function (sig) {
+                        var row = { id: id, name: beaconName, lat: lat, lng: lng, status: 'active' };
+                        if (batt != null) row.battery_pct = batt;
+                        if (sig != null) row.signal_bars = sig;
+                        supabase.from('unidades_live').upsert(row, { onConflict: 'id' }).then(function (res) {
+                            if (res.error) statusEl.textContent = 'Error: ' + (res.error.message || 'envío');
+                            else statusEl.textContent = 'Último envío: ' + new Date().toLocaleTimeString('es-AR');
+                        });
+                    });
+                });
+            }
+
+            function startBeacon() {
+                if (watchId != null) return;
+                msgEl.textContent = '';
+                statusEl.textContent = 'Obteniendo posición...';
+                latEl.textContent = '—';
+                lngEl.textContent = '—';
+                precisionEl.textContent = '—';
+                precisionEl.className = 'value';
+
+                watchId = navigator.geolocation.watchPosition(
+                    function (pos) {
+                        var lat = pos.coords.latitude;
+                        var lng = pos.coords.longitude;
+                        var acc = pos.coords.accuracy;
+                        latEl.textContent = lat.toFixed(5);
+                        lngEl.textContent = lng.toFixed(5);
+                        var p = precisionLabel(acc);
+                        precisionEl.textContent = p.text;
+                        precisionEl.className = 'value ' + p.cls;
+                        sendPosition(lat, lng, acc);
+                    },
+                    function (err) {
+                        statusEl.textContent = 'Error: ' + (err.message || 'denegado');
+                        statusEl.style.color = '#ff4444';
+                    },
+                    { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+                );
+
+                sendPositionOnce();
+                intervalId = setInterval(sendPositionOnce, BEACON_INTERVAL_MS);
+                requestWakeLock();
+
+                btn.classList.add('transmitting');
+                btnLabel.textContent = 'TRANSMITIENDO';
+                msgEl.textContent = '[ TRANSMITIDOR ACTIVO - BAJO PROTECCIÓN SENTINEL ]';
+                msgEl.classList.add('active');
+            }
+
+            function sendPositionOnce() {
+                navigator.geolocation.getCurrentPosition(
+                    function (pos) {
+                        sendPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+                        latEl.textContent = pos.coords.latitude.toFixed(5);
+                        lngEl.textContent = pos.coords.longitude.toFixed(5);
+                        var p = precisionLabel(pos.coords.accuracy);
+                        precisionEl.textContent = p.text;
+                        precisionEl.className = 'value ' + p.cls;
+                    },
+                    function () {}
+                );
+            }
+
+            function stopBeacon() {
+                if (watchId != null) {
+                    navigator.geolocation.clearWatch(watchId);
+                    watchId = null;
+                }
+                if (intervalId != null) {
+                    clearInterval(intervalId);
+                    intervalId = null;
+                }
+                releaseWakeLock();
+                btn.classList.remove('transmitting');
+                btnLabel.textContent = 'OFF';
+                msgEl.textContent = '';
+                msgEl.classList.remove('active');
+                statusEl.textContent = '';
+                statusEl.style.color = '';
+                latEl.textContent = '—';
+                lngEl.textContent = '—';
+                precisionEl.textContent = '—';
+                precisionEl.className = 'value';
+            }
+
+            btn.addEventListener('click', function () {
+                if (btn.classList.contains('transmitting')) stopBeacon();
+                else startBeacon();
+            });
+        })();
+    </script>
+</body>
+</html>
