@@ -116,24 +116,54 @@
         @media (max-width: 768px) {
             .btn-menu-toggle { display: flex !important; }
             .stats-hub { display: none; }
+            /* Móvil: paneles Telemetría y Cámara flotantes en esquinas superiores (transparentes, minimalistas) */
             .panels-drawer {
                 position: fixed;
+                top: 48px;
+                left: 0;
                 right: 0;
-                top: 0;
-                bottom: 0;
-                width: 85%;
-                max-width: 320px;
-                flex-direction: column;
-                background: rgba(5, 15, 22, 0.98);
-                backdrop-filter: blur(12px);
-                -webkit-backdrop-filter: blur(12px);
-                border-left: 2px solid rgba(0, 242, 255, 0.3);
-                box-shadow: -8px 0 32px rgba(0, 0, 0, 0.6);
-                transform: translateX(100%);
-                transition: transform 0.25s ease;
-                overflow-y: auto;
+                height: auto;
+                transform: none !important;
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: flex-start;
+                padding: 8px;
+                background: transparent;
+                z-index: 1002;
+                pointer-events: none;
+                overflow: visible;
             }
-            body.panels-open .panels-drawer { transform: translateX(0); }
+            .panels-drawer .unit-health-wrap,
+            .panels-drawer .sidebar { pointer-events: auto; }
+            .panels-drawer .unit-health-wrap {
+                background: rgba(0, 12, 18, 0.72);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                border: 1px solid rgba(0, 255, 255, 0.4);
+                border-radius: 6px;
+                padding: 6px 8px;
+                max-width: 120px;
+                font-size: 0.58rem;
+            }
+            .panels-drawer .unit-health-panel { width: auto; min-width: 0; padding: 4px 6px; font-size: 0.56rem; }
+            .panels-drawer .unit-health-panel-title { font-size: 0.6rem; margin-bottom: 4px; }
+            .panels-drawer .sidebar {
+                width: auto;
+                max-width: 130px;
+                min-width: 0;
+                background: rgba(0, 12, 18, 0.72);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                border: 1px solid rgba(0, 255, 255, 0.4);
+                border-radius: 6px;
+                overflow: hidden;
+            }
+            .panels-drawer .sidebar > .system-health-panel,
+            .panels-drawer .sidebar > .sidebar-title:not(.sidebar-cameras .sidebar-title),
+            .panels-drawer .sidebar > .sidebar-events { display: none !important; }
+            .panels-drawer .sidebar-cameras .camera-scan-wrap,
+            .panels-drawer .sidebar-cameras .cam-02-wrap { max-height: 56px; }
+            .panels-drawer .sidebar-cameras .sidebar-title { padding: 4px 6px; font-size: 0.6rem; }
             .panels-drawer .unit-health-wrap {
                 position: relative;
                 top: 0;
@@ -198,10 +228,14 @@
             }
             .top-bar-baliza { display: none !important; }
             .top-bar { display: none; }
+            /* Layout vertical: 1 columna — mapa 70%, logs 30% */
             .main-wrap {
-                flex: 1;
+                flex: 0 0 70vh;
+                height: 70vh;
                 min-height: 0;
                 width: 100%;
+                display: flex;
+                flex-direction: column;
             }
             .app-dashboard header {
                 flex-shrink: 0;
@@ -217,15 +251,26 @@
             }
             .map-sentinel-wrap #map {
                 width: 100% !important;
-                height: 70vh !important;
-                min-height: 70vh;
+                height: 100% !important;
+                min-height: 0;
             }
-            .sidebar { display: none; }
-            .mission-log { display: none; }
             .app-dashboard { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
-            /* Cuadrícula cyberpunk más fina en vertical para no romper estética */
+            /* Logs: 30% abajo, fuentes reducidas para más líneas sin scroll excesivo */
+            .mission-log {
+                display: flex !important;
+                flex-direction: column;
+                flex: 0 0 30vh;
+                height: 30vh;
+                min-height: 72px;
+                font-size: 0.58rem;
+            }
+            .mission-log-title { font-size: 0.62rem; margin-bottom: 4px; }
+            .mission-log-line { font-size: 0.56rem; padding: 1px 0; }
+            .mission-log #mission-log-entries { flex: 1; min-height: 0; overflow-y: auto; }
+            /* Cuadrícula más fina en móvil */
             .map-grid-overlay { background-size: 24px 24px; }
-            body::after { background-size: 100% 80px; }
+            /* Ocultar Digital Rain en móvil: ahorro de batería y mayor fluidez del mapa */
+            body::after { display: none !important; }
         }
         /* Deformación esférica leve — pantalla curva */
         .main-wrap {
