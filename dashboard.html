@@ -2523,6 +2523,57 @@
     }
     startGpsRealtime();
 
+    // --- MOTOR DE GEOLOCALIZACIÓN SMART TECH ---
+    var unitMarker = null;
+    function addLog(msg) { if (typeof console !== 'undefined') console.log(msg); }
+    function activarRastreoRealTime() {
+        if ("geolocation" in navigator) {
+            addLog("INICIANDO PROTOCOLO GPS... BUSCANDO SATÉLITES");
+            var geoOptions = {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 10000
+            };
+            navigator.geolocation.watchPosition(async function (position) {
+                var lat = position.coords.latitude;
+                var lng = position.coords.longitude;
+                var speed = position.coords.speed || 0;
+                var elLat = document.getElementById('unit-lat');
+                var elLng = document.getElementById('unit-lng');
+                var elStatus = document.getElementById('unit-status');
+                if (elLat) elLat.innerText = lat.toFixed(6);
+                if (elLng) elLng.innerText = lng.toFixed(6);
+                if (elStatus) {
+                    elStatus.innerText = "SIGNAL_STRONG";
+                    elStatus.style.color = "var(--fluor-green)";
+                }
+                var _u = await supabaseClient
+                    .from('unidades_live')
+                    .upsert({
+                        id: 'ROMAR_CEL',
+                        lat: lat,
+                        lng: lng,
+                        last_seen: new Date().toISOString()
+                    });
+                if (_u.error) console.error("Error de enlace:", _u.error);
+                if (typeof map !== 'undefined') map.flyTo([lat, lng], 16, { animate: true, duration: 1.5 });
+                if (!unitMarker) unitMarker = L.marker([lat, lng]).addTo(map);
+                else unitMarker.setLatLng([lat, lng]);
+                addLog("COORDENADAS CAPTURADAS: " + lat.toFixed(4) + " | VEL: " + speed + " km/h");
+            }, function (err) {
+                addLog("ERROR DE ENLACE SATELITAL: " + err.message);
+                var elStatus = document.getElementById('unit-status');
+                if (elStatus) {
+                    elStatus.innerText = "SIGNAL_LOST";
+                    elStatus.style.color = "var(--alert-red)";
+                }
+            }, geoOptions);
+        } else {
+            addLog("EL DISPOSITIVO NO SOPORTA PROTOCOLO GPS");
+        }
+    }
+    activarRastreoRealTime();
+
     // The Grid: actualizar coordenadas en bordes al mover el mapa
     function updateGridCoords() {
         var b = map.getBounds();
@@ -2970,7 +3021,8 @@
         });
     }
     function syncUnidadLiveToMap(row) {
-        var id = row.id;
+        var id = row.id != null ? String(row.id) : null;
+        if (!id) return;
         var status = (row.status || '').toLowerCase();
         if (status === 'gps_error') {
             appendMissionLog(row.name || 'ERROR: GPS BEACON NOT FOUND. PLEASE ENABLE LOCATION', true);
@@ -3275,28 +3327,39 @@
             .subscribe();
     }
 
-    // Suscripción en tiempo real a unidades_live (equivalente a useEffect + channel): nueva fila → dibuja icono; UPDATE → mueve icono con transición suave
+    // Suscripción en tiempo real a unidades_live: nueva fila → dibuja icono; UPDATE → mueve icono. Polling de respaldo por si Realtime no llega.
     function iniciarRealtimeUnidadesLive() {
-        supabaseClient
-            .from('unidades_live')
-            .select('id, name, lat, lng, status, battery_pct, signal_bars')
-            .then(function (_r) {
-                var data = _r.data;
-                if (data && data.length) data.forEach(function (row) { syncUnidadLiveToMap(row); });
-                updateFirstLiveUnitUI();
-            });
+        function fetchAndSyncUnidades() {
+            supabaseClient
+                .from('unidades_live')
+                .select('id, name, lat, lng, status, battery_pct, signal_bars')
+                .then(function (_r) {
+                    var data = _r.data;
+                    if (data && data.length) {
+                        data.forEach(function (row) { syncUnidadLiveToMap(row); });
+                        updateFirstLiveUnitUI();
+                        if (typeof map !== 'undefined' && map.invalidateSize) map.invalidateSize();
+                    }
+                })
+                .catch(function (err) { console.warn('unidades_live fetch:', err && err.message); });
+        }
+        fetchAndSyncUnidades();
+        setInterval(fetchAndSyncUnidades, 4000);
+
         supabaseClient
             .channel('unidades_live_changes')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'unidades_live' }, function (payload) {
-                syncUnidadLiveToMap(payload.new);
+                if (payload && payload.new) syncUnidadLiveToMap(payload.new);
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'unidades_live' }, function (payload) {
-                syncUnidadLiveToMap(payload.new);
+                if (payload && payload.new) syncUnidadLiveToMap(payload.new);
             })
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'unidades_live' }, function (payload) {
-                removeUnidadLiveFromMap(payload.old.id);
+                if (payload && payload.old && payload.old.id != null) removeUnidadLiveFromMap(String(payload.old.id));
             })
-            .subscribe();
+            .subscribe(function (status) {
+                if (status === 'CHANNEL_ERROR') console.warn('Realtime unidades_live: CHANNEL_ERROR - usando polling de respaldo.');
+            });
     }
 
     function getUnitLabelClass(state) {
