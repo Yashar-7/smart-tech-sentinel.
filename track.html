@@ -176,10 +176,9 @@
             var wakeLock = null;
 
             function getBeaconId() {
-                if (beaconId) return beaconId;
-                try {
-                    var stored = localStorage.getItem('core_beacon_id');
-                    if (stored) { beaconId = stored; return beaconId; }
+    beaconId = 'ROMAR_CEL'; // Forzamos tu ID de Admin
+    return beaconId;
+}
                 } catch (e) {}
                 beaconId = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/x/g, function () { return (Math.random() * 16 | 0).toString(16); });
                 try { localStorage.setItem('core_beacon_id', beaconId); } catch (e) {}
