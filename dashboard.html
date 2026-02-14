@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CORE Control Center - Smart Tech</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -116,60 +116,6 @@
         @media (max-width: 768px) {
             .btn-menu-toggle { display: flex !important; }
             .stats-hub { display: none; }
-            /* Móvil: paneles Telemetría y Cámara flotantes en esquinas superiores (transparentes, minimalistas) */
-            .panels-drawer {
-                position: fixed;
-                top: 48px;
-                left: 0;
-                right: 0;
-                height: auto;
-                transform: none !important;
-                flex-direction: row;
-                justify-content: space-between;
-                align-items: flex-start;
-                padding: 8px;
-                background: transparent;
-                z-index: 1002;
-                pointer-events: none;
-                overflow: visible;
-            }
-            .panels-drawer .unit-health-wrap,
-            .panels-drawer .sidebar { pointer-events: auto; }
-            .panels-drawer .unit-health-wrap {
-                background: rgba(0, 12, 18, 0.72);
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
-                border: 1px solid rgba(0, 255, 255, 0.4);
-                border-radius: 6px;
-                padding: 6px 8px;
-                max-width: 120px;
-                font-size: 0.58rem;
-            }
-            .panels-drawer .unit-health-panel { width: auto; min-width: 0; padding: 4px 6px; font-size: 0.56rem; }
-            .panels-drawer .unit-health-panel-title { font-size: 0.6rem; margin-bottom: 4px; }
-            .panels-drawer .sidebar {
-                width: auto;
-                max-width: 130px;
-                min-width: 0;
-                background: rgba(0, 12, 18, 0.72);
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
-                border: 1px solid rgba(0, 255, 255, 0.4);
-                border-radius: 6px;
-                overflow: hidden;
-            }
-            .panels-drawer .sidebar > .system-health-panel,
-            .panels-drawer .sidebar > .sidebar-title:not(.sidebar-cameras .sidebar-title),
-            .panels-drawer .sidebar > .sidebar-events { display: none !important; }
-            .panels-drawer .sidebar-cameras .camera-scan-wrap,
-            .panels-drawer .sidebar-cameras .cam-02-wrap { max-height: 56px; }
-            .panels-drawer .sidebar-cameras .sidebar-title { padding: 4px 6px; font-size: 0.6rem; }
-            .panels-drawer .unit-health-wrap {
-                position: relative;
-                top: 0;
-                padding: 12px;
-                flex-shrink: 0;
-            }
             .panels-open .panels-overlay {
                 opacity: 1;
                 pointer-events: auto;
@@ -228,14 +174,13 @@
             }
             .top-bar-baliza { display: none !important; }
             .top-bar { display: none; }
-            /* Layout vertical: 1 columna — mapa 70%, logs 30% */
-            .main-wrap {
-                flex: 0 0 70vh;
-                height: 70vh;
-                min-height: 0;
-                width: 100%;
+            /* Contenedor principal: flex columna en móvil */
+            .app-dashboard {
+                height: 100vh;
+                height: 100dvh;
                 display: flex;
                 flex-direction: column;
+                overflow-y: auto;
             }
             .app-dashboard header {
                 flex-shrink: 0;
@@ -243,33 +188,87 @@
             }
             .app-dashboard header h2 { font-size: 0.95rem; }
             .app-dashboard header small { display: none; }
-            .map-sentinel-wrap {
-                flex: 1;
+            .main-wrap {
+                display: flex !important;
+                flex-direction: column !important;
+                flex: 0 0 auto;
                 min-height: 0;
-                width: 100%;
-                height: 100%;
+                width: 100% !important;
+                max-width: 100%;
+            }
+            /* Orden táctico: mapa arriba (60% altura) */
+            .map-sentinel-wrap {
+                flex: 0 0 60vh;
+                height: 60vh;
+                min-height: 200px;
+                width: 100% !important;
             }
             .map-sentinel-wrap #map {
                 width: 100% !important;
                 height: 100% !important;
                 min-height: 0;
             }
-            .app-dashboard { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
-            /* Logs: 30% abajo, fuentes reducidas para más líneas sin scroll excesivo */
+            /* Paneles abajo: Unidad 01 y Cámara uno tras otro; System Health y Mission Log en scroll */
+            .panels-drawer {
+                position: relative !important;
+                flex: 0 0 40vh;
+                min-height: 180px;
+                max-height: 40vh;
+                display: flex;
+                flex-direction: column;
+                width: 100% !important;
+                overflow-y: auto;
+                overflow-x: hidden;
+                -webkit-overflow-scrolling: touch;
+            }
+            .panels-drawer .unit-health-wrap,
+            .panels-drawer .sidebar {
+                width: 100% !important;
+                max-width: 100% !important;
+                flex-shrink: 0;
+            }
+            .panels-drawer .unit-health-wrap {
+                padding: 10px 12px;
+                font-size: 0.6rem;
+            }
+            .panels-drawer .unit-health-panel { width: 100% !important; max-width: 100% !important; padding: 8px 10px; font-size: 0.58rem; }
+            .panels-drawer .sidebar {
+                width: 100% !important;
+                max-width: 100% !important;
+                min-width: 0;
+            }
+            .panels-drawer .sidebar-cameras .camera-scan-wrap,
+            .panels-drawer .sidebar-cameras .cam-02-wrap { max-height: 80px; }
+            .panels-drawer .sidebar-cameras .sidebar-title { padding: 6px 10px; }
+            /* System Health y Mission Log: visibles al hacer scroll (en flujo) */
             .mission-log {
                 display: flex !important;
                 flex-direction: column;
-                flex: 0 0 30vh;
-                height: 30vh;
+                flex: 0 0 auto;
+                width: 100% !important;
+                max-width: 100% !important;
                 min-height: 72px;
                 font-size: 0.58rem;
             }
             .mission-log-title { font-size: 0.62rem; margin-bottom: 4px; }
             .mission-log-line { font-size: 0.56rem; padding: 1px 0; }
             .mission-log #mission-log-entries { flex: 1; min-height: 0; overflow-y: auto; }
-            /* Cuadrícula más fina en móvil */
+            /* Anchos dinámicos: todos los paneles 100% en móvil */
+            .panel-glass,
+            .unit-health-panel,
+            .sidebar,
+            .sidebar-cameras,
+            .system-health-panel,
+            .mission-log,
+            .geofence-banner { width: 100% !important; max-width: 100% !important; box-sizing: border-box; }
+            /* Ocultar decorativos grandes para ver lat/long claramente */
+            .main-wrap .corner-hud,
+            .main-wrap .map-controls,
+            #sentinel-hud .sentinel-hud-eye,
+            #sentinel-hud .sentinel-hud-text,
+            .map-crosshair { display: none !important; }
+            .map-grid-coords { font-size: 10px; z-index: 500; }
             .map-grid-overlay { background-size: 24px 24px; }
-            /* Ocultar Digital Rain en móvil: ahorro de batería y mayor fluidez del mapa */
             body::after { display: none !important; }
         }
         /* Deformación esférica leve — pantalla curva */
