@@ -197,23 +197,104 @@
                 width: 100% !important;
                 max-width: 100%;
             }
-            /* Mapa protagonista: 50% de la pantalla en móvil */
+            /* Mapa casi pantalla completa cuando drawer cerrado (solo 40px de pestaña) */
             .map-sentinel-wrap {
-                flex: 0 0 50vh;
-                height: 50vh;
-                min-height: 180px;
+                flex: 1 1 auto;
+                min-height: 0;
+                height: calc(100vh - 40px - 52px);
                 width: 100% !important;
             }
             .map-sentinel-wrap #map {
                 width: 100% !important;
-                height: 50vh !important;
+                height: 100% !important;
                 min-height: 0;
             }
-            /* Paneles de telemetría debajo con scroll suave */
+            /* Telemetry Drawer: pestaña 40px "DATOS DE MISIÓN"; al tocar, sube al 50% con transición */
+            #telemetry-drawer {
+                position: fixed;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 1000;
+                pointer-events: none;
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+            }
+            #telemetry-drawer * { pointer-events: auto; }
+            .telemetry-drawer-tab {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                width: 100%;
+                height: 40px;
+                min-height: 40px;
+                padding: 0 16px;
+                background: rgba(0, 20, 30, 0.98);
+                border: 1px solid rgba(0, 242, 255, 0.5);
+                border-bottom: none;
+                border-radius: 12px 12px 0 0;
+                color: var(--neon-cyan);
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.68rem;
+                font-weight: 600;
+                letter-spacing: 1px;
+                cursor: pointer;
+                box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+                -webkit-tap-highlight-color: transparent;
+                flex-shrink: 0;
+            }
+            .telemetry-drawer-tab:hover { background: rgba(0, 30, 45, 0.98); }
+            .telemetry-drawer-tab-arrow {
+                font-size: 0.55rem;
+                transition: transform 0.3s ease;
+            }
+            #telemetry-drawer.open .telemetry-drawer-tab-arrow { transform: rotate(180deg); }
+            .telemetry-drawer-inner {
+                max-height: 0;
+                overflow: hidden;
+                background: rgba(0, 12, 18, 0.98);
+                border: 1px solid rgba(0, 242, 255, 0.4);
+                border-bottom: none;
+                border-radius: 12px 12px 0 0;
+                box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
+                transition: max-height 0.35s ease-out;
+                display: flex;
+                flex-direction: column;
+            }
+            #telemetry-drawer.open .telemetry-drawer-inner {
+                max-height: 50vh;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            #telemetry-drawer .mission-log {
+                flex: 1 1 auto;
+                min-height: 80px;
+                margin-top: 4px;
+            }
+            #telemetry-drawer .mission-log #mission-log-entries {
+                max-height: 120px;
+            }
+            #telemetry-drawer .unit-health-wrap {
+                padding: 8px 12px 20px;
+                font-size: 0.52rem;
+            }
+            #telemetry-drawer .unit-health-panel {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 6px 8px;
+                font-size: 0.5rem;
+            }
+            #telemetry-drawer .unit-health-panel-title { font-size: 0.54rem; margin-bottom: 2px; padding-bottom: 2px; }
+            #telemetry-drawer .unit-health-row { margin-bottom: 2px; }
+            #telemetry-drawer .unit-health-row .label,
+            #telemetry-drawer .unit-health-row .value { font-size: 0.48rem; }
+            /* Paneles debajo del mapa (sidebar, etc.) con scroll suave */
             .panels-drawer {
                 position: relative !important;
                 flex: 1 1 auto;
-                min-height: 120px;
+                min-height: 0;
                 display: flex;
                 flex-direction: column;
                 width: 100% !important;
@@ -222,29 +303,10 @@
                 -webkit-overflow-scrolling: touch;
                 scroll-behavior: smooth;
             }
-            .panels-drawer .unit-health-wrap,
             .panels-drawer .sidebar {
                 width: 100% !important;
                 max-width: 100% !important;
                 flex-shrink: 0;
-            }
-            .panels-drawer .unit-health-wrap {
-                padding: 4px 8px;
-                font-size: 0.52rem;
-            }
-            .panels-drawer .unit-health-panel {
-                width: 100% !important;
-                max-width: 100% !important;
-                padding: 4px 6px;
-                font-size: 0.5rem;
-            }
-            .panels-drawer .unit-health-panel-title { font-size: 0.54rem; margin-bottom: 2px; padding-bottom: 2px; }
-            .panels-drawer .unit-health-row { margin-bottom: 2px; }
-            .panels-drawer .unit-health-row .label,
-            .panels-drawer .unit-health-row .value { font-size: 0.48rem; }
-            .panels-drawer .sidebar {
-                width: 100% !important;
-                max-width: 100% !important;
                 min-width: 0;
             }
             .panels-drawer .sidebar-cameras .camera-scan-wrap,
@@ -1257,6 +1319,8 @@
         .signal-bars span:nth-child(4) { height: 15px; }
         .signal-bars span:nth-child(5) { height: 18px; opacity: 0.4; }
 
+        /* Pestaña del drawer de telemetría: solo visible en móvil */
+        .telemetry-drawer-tab { display: none; }
         /* Drawer de paneles (sidebar + unit-health); en desktop en flujo, en móvil overlay */
         .panels-drawer {
             display: flex;
@@ -2268,6 +2332,12 @@
         <div class="sentinel-hud-text">SCANNING MDQ_SECTOR_01... STATUS: ACTIVE</div>
     </div>
     <div class="panels-drawer">
+    <div id="telemetry-drawer" class="telemetry-drawer">
+        <button type="button" class="telemetry-drawer-tab" id="telemetry-drawer-tab" aria-expanded="false" aria-controls="telemetry-drawer-inner">
+            <span class="telemetry-drawer-tab-text">DATOS DE MISIÓN</span>
+            <span class="telemetry-drawer-tab-arrow" aria-hidden="true">▲</span>
+        </button>
+        <div id="telemetry-drawer-inner" class="telemetry-drawer-inner" role="region" aria-label="Telemetría de unidades">
     <div class="unit-health-wrap">
         <div class="unit-health-panel" id="health-panel-sim">
             <div class="unit-health-panel-title">UNIDAD 01 — Sin unidad</div>
@@ -2285,6 +2355,18 @@
             <div class="unit-health-row"><span class="label">PING (LATENCIA)</span><span class="value" id="telemetry-ping">—</span></div>
         </div>
     </div>
+    <div class="mission-log" id="mission-log">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div class="mission-log-title">[MISSION_LOG]</div>
+            <div style="display:flex; gap:8px;">
+                <button type="button" class="btn-cyberpunk" id="btn-reporte-incidentes" style="font-size:0.7rem;">REPORTE DE INCIDENTES</button>
+                <button type="button" class="btn-download-log" id="btn-descargar-log">DESCARGAR LOG</button>
+            </div>
+        </div>
+        <div id="mission-log-entries"></div>
+    </div>
+        </div><!-- .telemetry-drawer-inner -->
+    </div><!-- #telemetry-drawer -->
     <aside class="sidebar" id="dashboard-sidebar">
         <!-- Cámaras: CAM 01 — video directo calle de noche + overlay + cuadros que siguen -->
         <div class="sidebar-cameras">
@@ -2342,17 +2424,6 @@
     </aside>
     </div><!-- .panels-drawer -->
 </div><!-- .main-wrap -->
-
-<div class="mission-log">
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-        <div class="mission-log-title">[MISSION_LOG]</div>
-        <div style="display:flex; gap:8px;">
-            <button type="button" class="btn-cyberpunk" id="btn-reporte-incidentes" style="font-size:0.7rem;">REPORTE DE INCIDENTES</button>
-            <button type="button" class="btn-download-log" id="btn-descargar-log">DESCARGAR LOG</button>
-        </div>
-    </div>
-    <div id="mission-log-entries"></div>
-</div>
 
 <div id="incidents-panel" class="incidents-panel" aria-hidden="true">
     <div class="panel-header">
@@ -3154,9 +3225,11 @@
         if (idx !== -1) unidadesLiveOrder.splice(idx, 1);
         updateFirstLiveUnitUI();
     }
+    var DASHBOARD_ID_UNIDAD_01 = 'UNIDAD_01';
+    var DASHBOARD_ID_UNIDAD_02 = 'UNIDAD_02';
+
     function updateFirstLiveUnitUI() {
-        firstLiveUnitId = unidadesLiveOrder.length ? unidadesLiveOrder[0] : null;
-        var row = firstLiveUnitId ? unidadesLiveDataById[firstLiveUnitId] : null;
+        var row = unidadesLiveDataById[DASHBOARD_ID_UNIDAD_01] || null;
         var panel1 = document.getElementById('health-panel-sim');
         var title1 = panel1 ? panel1.querySelector('.unit-health-panel-title') : null;
         var batteryEl = document.getElementById('health-sim-battery');
@@ -3172,8 +3245,7 @@
         }
         if (coordsEl1) coordsEl1.textContent = (row && row.lat != null && row.lng != null) ? (Number(row.lat).toFixed(5) + ', ' + Number(row.lng).toFixed(5)) : '—';
         if (panel1) panel1.classList.toggle('critical', row && ((row.battery_pct != null && row.battery_pct < 15) || (row.signal_bars != null && row.signal_bars === 0)));
-        var secondId = unidadesLiveOrder[1];
-        var row2 = secondId ? unidadesLiveDataById[secondId] : null;
+        var row2 = unidadesLiveDataById[DASHBOARD_ID_UNIDAD_02] || null;
         var panel2 = document.getElementById('health-panel-02');
         var title2 = panel2 ? panel2.querySelector('.unit-health-panel-title') : null;
         var battery2 = document.getElementById('health-02-battery');
@@ -3187,6 +3259,7 @@
             for (var j = 0; j < (sp2.length || 0); j++) sp2[j].classList.toggle('off', j >= b2);
         }
         if (coordsEl2) coordsEl2.textContent = (row2 && row2.lat != null && row2.lng != null) ? (Number(row2.lat).toFixed(5) + ', ' + Number(row2.lng).toFixed(5)) : '—';
+        firstLiveUnitId = unidadesLiveOrder.length ? unidadesLiveOrder[0] : null;
         updateSentinelBeamToFirstUnit();
     }
     function updateSentinelBeamToFirstUnit() {
@@ -3658,6 +3731,19 @@
         }
         btn.addEventListener('click', togglePanels);
         overlay.addEventListener('click', closePanels);
+    })();
+
+    (function setupTelemetryDrawer() {
+        var drawer = document.getElementById('telemetry-drawer');
+        var tab = document.getElementById('telemetry-drawer-tab');
+        var inner = document.getElementById('telemetry-drawer-inner');
+        var tabText = drawer && drawer.querySelector('.telemetry-drawer-tab-text');
+        if (!drawer || !tab || !inner) return;
+        tab.addEventListener('click', function () {
+            var isOpen = drawer.classList.toggle('open');
+            tab.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            if (tabText) tabText.textContent = 'DATOS DE MISIÓN';
+        });
     })();
 
     // --- CENTRAR UNIDAD (Auto-Focus) ---

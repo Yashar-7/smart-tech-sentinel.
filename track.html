@@ -171,23 +171,49 @@
             var BEACON_INTERVAL_MS = 3000;
             var watchId = null;
             var intervalId = null;
-            var beaconId = null;
+            var beaconId = 'UNIDAD_01';
             var beaconName = 'Baliza Móvil';
             var isAdmin = false;
             var wakeLock = null;
 
             function getBeaconId() {
-                beaconId = 'ROMAR_CEL';
                 return beaconId;
             }
 
+            function nextUnidadId(takenIds) {
+                var taken = {};
+                (takenIds || []).forEach(function (id) {
+                    var m = (id || '').match(/^UNIDAD_(\d+)$/);
+                    if (m) taken[parseInt(m[1], 10)] = true;
+                });
+                var n = 1;
+                while (taken[n]) n++;
+                return 'UNIDAD_' + (n < 10 ? '0' + n : String(n));
+            }
+
+            function assignCallsign(session, done) {
+                supabase.from('unidades_live').select('id').then(function (res) {
+                    var rows = (res && res.data) || [];
+                    var ids = rows.map(function (r) { return r.id; });
+                    beaconId = nextUnidadId(ids);
+                    var num = beaconId.replace('UNIDAD_', '');
+                    beaconName = (session && session.user && session.user.email) ? session.user.email : ('Unidad ' + num);
+                    if (done) done();
+                }).catch(function () {
+                    beaconId = 'UNIDAD_01';
+                    beaconName = (session && session.user && session.user.email) ? session.user.email : 'Unidad 01';
+                    if (done) done();
+                });
+            }
+
             function initUser() {
-                getBeaconId();
                 supabase.auth.getSession().then(function (r) {
                     var session = r.data && r.data.session;
                     if (session && session.user) {
-                        beaconName = session.user.email || 'Administrador';
                         isAdmin = true;
+                        assignCallsign(session, null);
+                    } else {
+                        assignCallsign(null, null);
                     }
                 });
             }
