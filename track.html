@@ -106,7 +106,34 @@
             0%, 100% { box-shadow: 0 0 40px rgba(0, 255, 136, 0.4), inset 0 0 50px rgba(0, 255, 136, 0.08); opacity: 1; }
             50% { box-shadow: 0 0 60px rgba(0, 255, 136, 0.7), inset 0 0 70px rgba(0, 255, 136, 0.12); opacity: 0.92; }
         }
+        .beacon-btn.connecting {
+            border-color: #ffcc00;
+            color: #ffcc00;
+            background: radial-gradient(circle at 35% 35%, rgba(255, 204, 0, 0.12), var(--dark-bg));
+            box-shadow: 0 0 35px rgba(255, 204, 0, 0.5), inset 0 0 40px rgba(255, 204, 0, 0.06);
+            animation: beacon-yellow-blink 1s ease-in-out infinite;
+        }
+        .beacon-btn.connecting .sentinel-logo { opacity: 0.9; filter: drop-shadow(0 0 6px #ffcc00); }
+        @keyframes beacon-yellow-blink {
+            0%, 100% { box-shadow: 0 0 35px rgba(255, 204, 0, 0.5), inset 0 0 40px rgba(255, 204, 0, 0.06); opacity: 1; }
+            50% { box-shadow: 0 0 55px rgba(255, 204, 0, 0.8), inset 0 0 50px rgba(255, 204, 0, 0.1); opacity: 0.9; }
+        }
         .beacon-btn .btn-label { font-size: clamp(0.85rem, 2.8vw, 1rem); }
+        .beacon-state-text {
+            min-height: 2em;
+            text-align: center;
+            font-size: clamp(0.95rem, 3vw, 1.1rem);
+            letter-spacing: 2px;
+            color: rgba(0, 242, 255, 0.7);
+        }
+        .beacon-state-text.connected {
+            color: #00ff88;
+            text-shadow: 0 0 12px rgba(0, 255, 136, 0.8);
+            font-weight: 600;
+        }
+        .beacon-state-text.error {
+            color: #ff4444;
+        }
         .beacon-live {
             width: 100%;
             max-width: 320px;
@@ -143,6 +170,7 @@
                 <span class="btn-label" id="beacon-btn-label">ACTIVAR BALIZA</span>
             </button>
         </div>
+        <div id="beacon-state-text" class="beacon-state-text" aria-live="polite"></div>
         <div id="beacon-msg" class="beacon-msg"></div>
         <div class="beacon-live" id="beacon-live">
             <div class="row" id="beacon-id-row" style="display: none;"><span class="label">ID ENVÍO</span><span class="value" id="beacon-id-value">—</span></div>
@@ -163,6 +191,7 @@
 
             var btn = document.getElementById('beacon-btn');
             var btnLabel = document.getElementById('beacon-btn-label');
+            var stateTextEl = document.getElementById('beacon-state-text');
             var msgEl = document.getElementById('beacon-msg');
             var statusEl = document.getElementById('beacon-status');
             var latEl = document.getElementById('beacon-lat');
@@ -171,6 +200,25 @@
             var idRowEl = document.getElementById('beacon-id-row');
             var idValueEl = document.getElementById('beacon-id-value');
 
+            function setStateText(msg, className) {
+                if (!stateTextEl) return;
+                stateTextEl.textContent = msg || '';
+                stateTextEl.className = 'beacon-state-text' + (className ? ' ' + className : '');
+            }
+            function setConnecting(yes) {
+                if (btn) btn.classList.toggle('connecting', !!yes);
+            }
+            function isPermissionOrLimitError(errMsg) {
+                if (!errMsg || typeof errMsg !== 'string') return false;
+                var s = errMsg.toLowerCase();
+                return /policy|rls|row level security|permission|denied|forbidden|limit|quota|exceeded/.test(s);
+            }
+            function showErrorAlertGiant(msg) {
+                var full = '⚠️ ERROR DE SUPABASE - SACÁ CAPTURA Y ENVIÁ ESTO\n\n' + (msg || 'Error desconocido');
+                console.error(full);
+                try { alert(full); } catch (a) {}
+            }
+
             var BEACON_INTERVAL_MS = 3000;
             var watchId = null;
             var intervalId = null;
@@ -178,6 +226,8 @@
             var beaconName = 'Baliza Móvil';
             var isAdmin = false;
             var wakeLock = null;
+            // user_id de la sesión activa (no se exige sesión confirmada; si hay sesión se envía para RLS).
+            var currentUserId = null;
 
             function getBeaconId() {
                 return beaconId;
@@ -196,13 +246,25 @@
 
             function assignCallsign(session, done) {
                 supabase.from('unidades_live').select('id').then(function (res) {
+                    if (res && res.error) {
+                        var errMsg = res.error.message || res.error.code || '';
+                        console.error('Supabase unidades_live select error:', res.error);
+                        setStateText('Error: ' + errMsg, 'error');
+                        if (isPermissionOrLimitError(errMsg)) showErrorAlertGiant(errMsg);
+                        else try { alert('Error leyendo unidades: ' + errMsg); } catch (a) {}
+                    }
                     var rows = (res && res.data) || [];
                     var ids = rows.map(function (r) { return r.id; });
                     beaconId = nextUnidadId(ids);
                     var num = beaconId.replace('UNIDAD_', '');
                     beaconName = (session && session.user && session.user.email) ? session.user.email : ('Unidad ' + num);
                     if (done) done();
-                }).catch(function () {
+                }).catch(function (err) {
+                    var errMsg = (err && err.message) ? err.message : String(err);
+                    console.error('Supabase unidades_live select catch:', err);
+                    setStateText('Error: ' + errMsg, 'error');
+                    if (isPermissionOrLimitError(errMsg)) showErrorAlertGiant(errMsg);
+                    else try { alert('Error conexión: ' + errMsg); } catch (a) {}
                     beaconId = 'UNIDAD_01';
                     beaconName = (session && session.user && session.user.email) ? session.user.email : 'Unidad 01';
                     if (done) done();
@@ -210,14 +272,27 @@
             }
 
             function initUser() {
+                setStateText('Iniciando sesión...');
+                setConnecting(true);
                 supabase.auth.getSession().then(function (r) {
                     var session = r.data && r.data.session;
                     if (session && session.user) {
                         isAdmin = true;
-                        assignCallsign(session, null);
+                        currentUserId = session.user.id;
+                        assignCallsign(session, function () {
+                            setConnecting(false);
+                            setStateText('');
+                        });
                     } else {
-                        assignCallsign(null, null);
+                        currentUserId = null;
+                        assignCallsign(null, function () {
+                            setConnecting(false);
+                            setStateText('');
+                        });
                     }
+                }).catch(function (err) {
+                    setConnecting(false);
+                    setStateText('Error: ' + (err && err.message ? err.message : 'sesión'), 'error');
                 });
             }
             initUser();
@@ -287,19 +362,32 @@
                         };
                         if (batt != null) row.battery_pct = batt;
                         if (sig != null) row.signal_bars = sig;
+                        if (currentUserId) row.user_id = currentUserId;
                         supabase.from('unidades_live').upsert(row, { onConflict: 'id' })
                             .then(function (res) {
                                 if (res.error) {
-                                    statusEl.textContent = 'Error: ' + (res.error.message || 'envío');
+                                    var errMsg = res.error.message || res.error.code || 'envío';
+                                    console.error('Supabase unidades_live upsert error:', res.error);
+                                    setStateText('Error: ' + errMsg, 'error');
+                                    statusEl.textContent = 'Error: ' + errMsg;
                                     statusEl.style.color = '#ff4444';
+                                    if (isPermissionOrLimitError(errMsg)) showErrorAlertGiant(errMsg);
+                                    else try { alert('Error Supabase: ' + errMsg); } catch (a) {}
                                 } else {
+                                    setStateText('CONECTADO AL RADAR', 'connected');
+                                    setConnecting(false);
                                     statusEl.textContent = 'Último envío: ' + new Date().toLocaleTimeString('es-AR') + ' (ID: ' + id + ')';
                                     statusEl.style.color = '';
                                 }
                             })
                             .catch(function (err) {
-                                statusEl.textContent = 'Error envío: ' + (err && err.message ? err.message : 'red');
+                                var errMsg = (err && err.message) ? err.message : (err && err.code) ? err.code : String(err);
+                                console.error('Supabase unidades_live upsert catch:', err);
+                                setStateText('Error: ' + errMsg, 'error');
+                                statusEl.textContent = 'Error envío: ' + errMsg;
                                 statusEl.style.color = '#ff4444';
+                                if (isPermissionOrLimitError(errMsg)) showErrorAlertGiant(errMsg);
+                                else try { alert('Error envío Supabase: ' + errMsg); } catch (a) {}
                             });
                     });
                 });
@@ -314,7 +402,24 @@
                     lng: null,
                     status: 'gps_error'
                 };
-                supabase.from('unidades_live').upsert(row, { onConflict: 'id' }).then(function () {});
+                if (currentUserId) row.user_id = currentUserId;
+                supabase.from('unidades_live').upsert(row, { onConflict: 'id' })
+                    .then(function (res) {
+                        if (res && res.error) {
+                            var errMsg = res.error.message || res.error.code || '';
+                            console.error('Supabase unidades_live upsert (gps_error) error:', res.error);
+                            setStateText('Error: ' + errMsg, 'error');
+                            if (isPermissionOrLimitError(errMsg)) showErrorAlertGiant(errMsg);
+                            else try { alert('Error Supabase: ' + errMsg); } catch (a) {}
+                        }
+                    })
+                    .catch(function (err) {
+                        var errMsg = (err && err.message) ? err.message : String(err);
+                        console.error('Supabase unidades_live upsert (gps_error) catch:', err);
+                        setStateText('Error: ' + errMsg, 'error');
+                        if (isPermissionOrLimitError(errMsg)) showErrorAlertGiant(errMsg);
+                        else try { alert('Error envío: ' + errMsg); } catch (a) {}
+                    });
             }
 
             function startWatchPosition() {
@@ -332,6 +437,7 @@
                             sendPosition(lat, lng, acc);
                         },
                         function (err) {
+                            setStateText('Error: ' + (err.message || 'denegado'), 'error');
                             statusEl.textContent = 'Error: ' + (err.message || 'denegado');
                             statusEl.style.color = '#ff4444';
                             latEl.textContent = '—';
@@ -341,6 +447,7 @@
                         { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
                     );
                 } catch (e) {
+                    setStateText('Error: ' + (e.message || 'GPS no disponible'), 'error');
                     statusEl.textContent = 'Error: ' + (e.message || 'GPS no disponible');
                     statusEl.style.color = '#ff4444';
                     sendGpsErrorToWarRoom();
@@ -352,6 +459,8 @@
             function startBeacon() {
                 if (watchId != null) return;
                 msgEl.textContent = '';
+                setStateText('Obteniendo posición...');
+                setConnecting(true);
                 statusEl.textContent = 'Obteniendo posición...';
                 latEl.textContent = 'Esperando GPS…';
                 lngEl.textContent = 'Esperando GPS…';
@@ -398,6 +507,8 @@
                     intervalId = null;
                 }
                 releaseWakeLock();
+                setConnecting(false);
+                setStateText('');
                 btn.classList.remove('transmitting');
                 btnLabel.textContent = 'ACTIVAR BALIZA';
                 msgEl.textContent = '';
@@ -420,26 +531,32 @@
                     return;
                 }
                 if (!navigator.geolocation) {
+                    setStateText('Tu navegador no soporta geolocalización', 'error');
                     statusEl.textContent = 'Tu navegador no soporta geolocalización';
                     statusEl.style.color = '#ff4444';
                     return;
                 }
-                // Despertar GPS: primero getCurrentPosition para forzar el permiso en móvil, luego watchPosition
+                setStateText('Buscando satélites...');
+                setConnecting(true);
                 statusEl.textContent = 'Solicitando permiso de ubicación...';
                 statusEl.style.color = '';
                 navigator.geolocation.getCurrentPosition(
                     function () {
-                        // Asegurar ID correcto en unidades_live antes de empezar a enviar
+                        // Forzar user_id de sesión activa para que la fila aparezca en unidades_live (RLS)
                         supabase.auth.getSession().then(function (r) {
                             var session = (r.data && r.data.session) || null;
+                            currentUserId = (session && session.user) ? session.user.id : null;
                             assignCallsign(session, function () {
                                 startBeacon();
                             });
                         }).catch(function () {
+                            currentUserId = null;
                             assignCallsign(null, function () { startBeacon(); });
                         });
                     },
                     function (err) {
+                        setStateText('Error: ' + (err.message || 'Permiso denegado'), 'error');
+                        setConnecting(false);
                         statusEl.textContent = 'Error: ' + (err.message || 'Permiso denegado');
                         statusEl.style.color = '#ff4444';
                         sendGpsErrorToWarRoom();
