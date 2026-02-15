@@ -197,11 +197,11 @@
                 width: 100% !important;
                 max-width: 100%;
             }
-            /* Mapa casi pantalla completa cuando drawer cerrado (solo 40px de pestaña) */
+            /* Mapa a todo el fondo; drawers (ESTADO + DATOS DE MISIÓN) superpuestos abajo */
             .map-sentinel-wrap {
                 flex: 1 1 auto;
                 min-height: 0;
-                height: calc(100vh - 40px - 52px);
+                height: calc(100vh - 52px);
                 width: 100% !important;
             }
             .map-sentinel-wrap #map {
@@ -290,19 +290,75 @@
             #telemetry-drawer .unit-health-row { margin-bottom: 2px; }
             #telemetry-drawer .unit-health-row .label,
             #telemetry-drawer .unit-health-row .value { font-size: 0.48rem; }
-            /* Paneles debajo del mapa (sidebar, etc.) con scroll suave */
+            /* Drawer ESTADO: barra fina "ESTADO" arriba de DATOS DE MISIÓN; solo se abre al deslizar arriba */
+            #estado-drawer {
+                position: fixed;
+                left: 0;
+                right: 0;
+                bottom: 40px;
+                z-index: 999;
+                pointer-events: none;
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+            }
+            #estado-drawer * { pointer-events: auto; }
+            .estado-drawer-tab {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+                height: 28px;
+                min-height: 28px;
+                padding: 0 12px;
+                background: rgba(0, 18, 28, 0.95);
+                border: 1px solid rgba(0, 242, 255, 0.4);
+                border-bottom: none;
+                border-radius: 10px 10px 0 0;
+                color: var(--neon-cyan);
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.6rem;
+                font-weight: 600;
+                letter-spacing: 2px;
+                cursor: pointer;
+                -webkit-tap-highlight-color: transparent;
+                flex-shrink: 0;
+            }
+            .estado-drawer-tab:hover { background: rgba(0, 28, 40, 0.98); }
+            .estado-drawer-inner {
+                max-height: 0;
+                overflow: hidden;
+                background: rgba(0, 12, 18, 0.98);
+                border: 1px solid rgba(0, 242, 255, 0.4);
+                border-bottom: none;
+                border-radius: 10px 10px 0 0;
+                box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.5);
+                transition: max-height 0.35s ease-out;
+            }
+            #estado-drawer.open .estado-drawer-inner {
+                max-height: 55vh;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            #estado-drawer .sidebar {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 10px 12px 16px;
+            }
+            #estado-drawer .sidebar-cameras .camera-scan-wrap,
+            #estado-drawer .sidebar-cameras .cam-02-wrap { max-height: 100px; }
+            /* Paneles en móvil: sin altura en flujo para que el mapa llene todo; drawers fijos */
             .panels-drawer {
                 position: relative !important;
-                flex: 1 1 auto;
-                min-height: 0;
+                flex: 0 0 0 !important;
+                min-height: 0 !important;
                 display: flex;
                 flex-direction: column;
                 width: 100% !important;
-                overflow-y: auto;
-                overflow-x: hidden;
-                -webkit-overflow-scrolling: touch;
-                scroll-behavior: smooth;
+                overflow: visible;
+                pointer-events: none;
             }
+            .panels-drawer > * { pointer-events: auto; }
             .panels-drawer .sidebar {
                 width: 100% !important;
                 max-width: 100% !important;
@@ -1321,6 +1377,10 @@
 
         /* Pestaña del drawer de telemetría: solo visible en móvil */
         .telemetry-drawer-tab { display: none; }
+        /* Drawer ESTADO: en desktop no es drawer, solo contenedor en flujo */
+        #estado-drawer { position: relative; bottom: auto; }
+        .estado-drawer-tab { display: none; }
+        .estado-drawer-inner { max-height: none; overflow: visible; }
         /* Drawer de paneles (sidebar + unit-health); en desktop en flujo, en móvil overlay */
         .panels-drawer {
             display: flex;
@@ -2367,6 +2427,9 @@
     </div>
         </div><!-- .telemetry-drawer-inner -->
     </div><!-- #telemetry-drawer -->
+    <div id="estado-drawer" class="estado-drawer" aria-hidden="false">
+        <button type="button" class="estado-drawer-tab" id="estado-drawer-tab" aria-expanded="false" aria-controls="estado-drawer-inner">ESTADO</button>
+        <div id="estado-drawer-inner" class="estado-drawer-inner" role="region" aria-label="Estado del sistema y cámaras">
     <aside class="sidebar" id="dashboard-sidebar">
         <!-- Cámaras: CAM 01 — video directo calle de noche + overlay + cuadros que siguen -->
         <div class="sidebar-cameras">
@@ -2422,6 +2485,8 @@
             <div style="text-align:center; color:#555; font-size:0.75rem; padding:20px;">Cargando eventos...</div>
         </div>
     </aside>
+        </div><!-- .estado-drawer-inner -->
+    </div><!-- #estado-drawer -->
     </div><!-- .panels-drawer -->
 </div><!-- .main-wrap -->
 
@@ -2651,7 +2716,7 @@
     startGpsRealtime();
 
     // --- MOTOR DE GEOLOCALIZACIÓN SMART TECH ---
-    var unitMarker = null;
+    // La posición del PC se envía a unidades_live (ROMAR_CEL); el marcador se crea/actualiza vía syncUnidadLiveToMap (unidadesLiveMarkersById).
     function addLog(msg) { if (typeof console !== 'undefined') console.log(msg); }
     function activarRastreoRealTime() {
         if ("geolocation" in navigator) {
@@ -2674,18 +2739,18 @@
                     elStatus.innerText = "SIGNAL_STRONG";
                     elStatus.style.color = "var(--fluor-green)";
                 }
+                var row = { id: 'ROMAR_CEL', lat: lat, lng: lng, name: 'PC', status: 'active' };
                 var _u = await supabaseClient
                     .from('unidades_live')
                     .upsert({
-                        id: 'ROMAR_CEL',
+                        id: row.id,
                         lat: lat,
                         lng: lng,
                         last_seen: new Date().toISOString()
                     });
                 if (_u.error) console.error("Error de enlace:", _u.error);
                 if (typeof map !== 'undefined') map.flyTo([lat, lng], 16, { animate: true, duration: 1.5 });
-                if (!unitMarker) unitMarker = L.marker([lat, lng]).addTo(map);
-                else unitMarker.setLatLng([lat, lng]);
+                if (typeof syncUnidadLiveToMap === 'function') syncUnidadLiveToMap(row);
                 addLog("COORDENADAS CAPTURADAS: " + lat.toFixed(4) + " | VEL: " + speed + " km/h");
             }, function (err) {
                 addLog("ERROR DE ENLACE SATELITAL: " + err.message);
@@ -3020,6 +3085,7 @@
 
     const unidadesActivas = {};
     const alertMarkersById = {};
+    // Marcadores del mapa por ID de unidad (UNIDAD_01, UNIDAD_02, ROMAR_CEL, etc.). Un marcador por fila en unidades_live.
     const unidadesLiveMarkersById = {};
     var unidadesLiveDataById = {};
     var unidadesLiveOrder = [];
@@ -3176,6 +3242,20 @@
             signal_bars: raw.signal_bars
         };
     }
+    // Crea el marcador en el mapa si ese ID aún no tiene uno. Se llama desde syncUnidadLiveToMap y desde Realtime.
+    function ensureUnidadLiveMarker(id, row) {
+        if (!id || unidadesLiveMarkersById[id]) return unidadesLiveMarkersById[id];
+        var lat = row.lat;
+        var lng = row.lng;
+        if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) return null;
+        var name = (row.name || 'Unidad ' + id).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        var popupHtml = '<div class="popup-inner"><div class="popup-title">' + name + '</div><div class="popup-speed">Estado: ' + (row.status || '—') + '</div></div>';
+        var circleOpts = getCircleMarkerOptionsForUnidadLive(row.status);
+        var marker = L.circleMarker([lat, lng], circleOpts).addTo(map);
+        marker.bindPopup(popupHtml, { className: 'cyberpunk-popup' });
+        unidadesLiveMarkersById[id] = marker;
+        return marker;
+    }
     function syncUnidadLiveToMap(row) {
         var normalized = normalizeUnidadLiveRow(row);
         if (!normalized || !normalized.id) return;
@@ -3194,8 +3274,8 @@
         var popupHtml = '<div class="popup-inner"><div class="popup-title">' + name + '</div><div class="popup-speed">Estado: ' + (row.status || '—') + '</div></div>';
         unidadesLiveDataById[id] = row;
         if (unidadesLiveOrder.indexOf(id) === -1) unidadesLiveOrder.push(id);
-        if (unidadesLiveMarkersById[id]) {
-            var m = unidadesLiveMarkersById[id];
+        var m = unidadesLiveMarkersById[id];
+        if (m) {
             var from = m.getLatLng();
             var to = L.latLng(lat, lng);
             smoothMoveMarker(m, from, to, 1500, function () {
@@ -3207,10 +3287,7 @@
             updateFirstLiveUnitUI();
             return;
         }
-        var circleOpts = getCircleMarkerOptionsForUnidadLive(row.status);
-        var marker = L.circleMarker([lat, lng], circleOpts).addTo(map);
-        marker.bindPopup(popupHtml, { className: 'cyberpunk-popup' });
-        unidadesLiveMarkersById[id] = marker;
+        ensureUnidadLiveMarker(id, row);
         appendMissionLog('BEACON DETECTED: ' + (row.name || 'Unidad'), false);
         updateFirstLiveUnitUI();
     }
@@ -3488,7 +3565,8 @@
             .subscribe();
     }
 
-    // Suscripción en tiempo real a unidades_live: SIN filtrar por ID. Todas las filas de la tabla generan un marcador.
+    // Suscripción Realtime a unidades_live: escucha TODOS los cambios (INSERT/UPDATE/DELETE) sin filtrar por fila.
+    // Cualquier ID nuevo (UNIDAD_01, UNIDAD_02, etc.) que no tenga marcador se crea con ensureUnidadLiveMarker vía syncUnidadLiveToMap.
     function iniciarRealtimeUnidadesLive() {
         function fetchAndSyncUnidades() {
             supabaseClient
@@ -3507,20 +3585,25 @@
         fetchAndSyncUnidades();
         setInterval(fetchAndSyncUnidades, 4000);
 
-        supabaseClient
-            .channel('unidades_live_changes')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'unidades_live' }, function (payload) {
-                if (payload && payload.new) syncUnidadLiveToMap(payload.new);
-            })
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'unidades_live' }, function (payload) {
-                if (payload && payload.new) syncUnidadLiveToMap(payload.new);
-            })
-            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'unidades_live' }, function (payload) {
-                if (payload && payload.old && payload.old.id != null) removeUnidadLiveFromMap(String(payload.old.id));
-            })
-            .subscribe(function (status) {
-                if (status === 'CHANNEL_ERROR') console.warn('Realtime unidades_live: CHANNEL_ERROR - usando polling de respaldo.');
-            });
+        var channel = supabaseClient.channel('unidades_live_changes');
+        channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'unidades_live' }, function (payload) {
+            if (payload && payload.new) {
+                var row = normalizeUnidadLiveRow(payload.new) || payload.new;
+                if (row && row.id) syncUnidadLiveToMap(row);
+            }
+        });
+        channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'unidades_live' }, function (payload) {
+            if (payload && payload.new) {
+                var row = normalizeUnidadLiveRow(payload.new) || payload.new;
+                if (row && row.id) syncUnidadLiveToMap(row);
+            }
+        });
+        channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'unidades_live' }, function (payload) {
+            if (payload && payload.old && payload.old.id != null) removeUnidadLiveFromMap(String(payload.old.id));
+        });
+        channel.subscribe(function (status) {
+            if (status === 'CHANNEL_ERROR') console.warn('Realtime unidades_live: CHANNEL_ERROR - usando polling de respaldo.');
+        });
     }
 
     function getUnitLabelClass(state) {
@@ -3744,6 +3827,36 @@
             tab.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
             if (tabText) tabText.textContent = 'DATOS DE MISIÓN';
         });
+    })();
+
+    (function setupEstadoDrawer() {
+        var drawer = document.getElementById('estado-drawer');
+        var tab = document.getElementById('estado-drawer-tab');
+        var inner = document.getElementById('estado-drawer-inner');
+        if (!drawer || !tab || !inner) return;
+        function setOpen(open) {
+            drawer.classList.toggle('open', open);
+            tab.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+        tab.addEventListener('click', function () { setOpen(!drawer.classList.contains('open')); });
+        var startY = 0;
+        tab.addEventListener('touchstart', function (e) {
+            startY = e.touches[0].clientY;
+        }, { passive: true });
+        tab.addEventListener('touchend', function (e) {
+            if (e.changedTouches.length === 0) return;
+            var endY = e.changedTouches[0].clientY;
+            var delta = startY - endY;
+            if (Math.abs(delta) < 25) return;
+            if (delta > 0) setOpen(true);
+            else setOpen(false);
+        }, { passive: true });
+        inner.addEventListener('touchstart', function (e) { startY = e.touches[0].clientY; }, { passive: true });
+        inner.addEventListener('touchend', function (e) {
+            if (e.changedTouches.length === 0) return;
+            var endY = e.changedTouches[0].clientY;
+            if (startY - endY < -40) setOpen(false);
+        }, { passive: true });
     })();
 
     // --- CENTRAR UNIDAD (Auto-Focus) ---
