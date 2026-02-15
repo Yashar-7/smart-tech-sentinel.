@@ -167,13 +167,13 @@
 
                 const { error } = await supabase
                     .from('unidades_live')
+                    // BUSCÁ ESTO:
                     .upsert({
-                        id: beaconId,
+                         id: beaconId,
                         name: 'Baliza En Vivo',
                         lat: latitude,
                         lng: longitude,
-                        status: 'active',
-                        last_update: new Date().toISOString()
+                        status: 'active'
                     });
 
                 if (error) {
