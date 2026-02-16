@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SENTINEL V6.2 - CORE RESTORED</title>
+    <title>SMART TECH - SENTINEL CORE V7</title>
+    
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -12,48 +13,30 @@
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
     <style>
         :root { --neon: #00f2ff; --panic: #ff003c; --bg: #010203; }
-        body, html, #root { height: 100%; margin: 0; background: var(--bg); overflow: hidden; color: var(--neon); font-family: 'Share Tech Mono', monospace; }
+        body, html, #root { height: 100%; margin: 0; background: var(--bg); color: var(--neon); font-family: 'Share Tech Mono', monospace; overflow: hidden; }
         
-        /* EL MAPA TÁCTICO DE VERDAD */
-        #map { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;
-            /* El filtro secreto para el look Cyberpunk */
-            filter: invert(100%) hue-rotate(185deg) brightness(0.4) contrast(1.4) saturate(1.5);
-            background: #000 !important;
-        }
+        /* ESTILO DEL MAPA DASHBOARD */
+        #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        .leaflet-container { background: #000 !important; }
 
-        /* HUD - PANELES FLOTANTES ESTILO CORE CONTROL */
-        .hud-overlay {
-            position: absolute; inset: 0; z-index: 100; pointer-events: none;
-            padding: 25px; display: flex; flex-direction: column; justify-content: justify-between;
-        }
-
-        .cyber-card {
-            pointer-events: auto;
-            background: rgba(0, 15, 20, 0.75);
-            border: 1px solid var(--neon);
-            box-shadow: 0 0 15px rgba(0, 242, 255, 0.1), inset 0 0 20px rgba(0, 242, 255, 0.05);
-            backdrop-filter: blur(8px);
-            position: relative;
-        }
-
-        .cyber-card::before {
-            content: ""; position: absolute; top: -2px; left: 10%; width: 80%; height: 1px; background: var(--neon); box-shadow: 0 0 10px var(--neon);
-        }
-
-        .panic-active {
-            animation: panic-flash 0.5s infinite;
-            border: 2px solid var(--panic) !important;
-            box-shadow: 0 0 30px var(--panic) !important;
-        }
-
-        @keyframes panic-flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-
-        /* Iconos de Unidades */
-        .unit-marker { background: var(--neon); border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px var(--neon); }
+        /* HUD OVERLAY */
+        .hud-container { position: absolute; inset: 0; z-index: 1000; pointer-events: none; padding: 15px; display: grid; grid-template-columns: 320px 1fr 350px; grid-template-rows: 80px 1fr 200px; gap: 15px; }
+        .panel { pointer-events: auto; background: rgba(0, 10, 15, 0.85); border: 1px solid rgba(0, 242, 255, 0.2); backdrop-filter: blur(5px); padding: 12px; position: relative; }
+        .panel::before { content: ""; position: absolute; top: 0; left: 0; width: 10px; height: 10px; border-top: 2px solid var(--neon); border-left: 2px solid var(--neon); }
+        
+        .header-core { grid-column: 1 / 4; display: flex; justify-content: justify-between; align-items: center; border-bottom: 1px solid var(--neon); background: linear-gradient(90deg, rgba(0,242,255,0.1), transparent); }
+        .video-box { aspect-ratio: 16/9; background: #000; border: 1px solid #333; overflow: hidden; position: relative; margin-bottom: 10px; }
+        .scanline { width: 100%; height: 2px; background: rgba(0, 242, 255, 0.1); position: absolute; top: 0; animation: scanning 3s linear infinite; }
+        @keyframes scanning { from { top: 0; } to { top: 100%; } }
+        
+        .panic-btn { background: #ff003c; color: white; border: none; font-weight: bold; cursor: pointer; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0px rgba(255,0,60,0.7); } 100% { box-shadow: 0 0 0 20px rgba(255,0,60,0); } }
+        
+        .unit-dot { width: 12px; height: 12px; background: var(--neon); border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 10px var(--neon); }
     </style>
 </head>
 <body>
@@ -61,24 +44,24 @@
 
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
-        const supabase = window.supabase.createClient('https://svpurpvbiujhcbiugrkh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2cHVycHZbiujhcbiugrkhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NDgzMTUsImV4cCI6MjA4MzMyNDMxNX0.AivKJ0_N0z_4T4vLNfUcE2hepJ1XXOO8-4fSA3PJXdc');
+        const supabase = window.supabase.createClient('https://svpurpvbiujhcbiugrkh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2cHVycHZiaXVqaGNiaXVncmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NDgzMTUsImV4cCI6MjA4MzMyNDMxNX0.AivKJ0_N0z_4T4vLNfUcE2hepJ1XXOO8-4fSA3PJXdc');
 
         const WarRoom = () => {
             const [units, setUnits] = useState([]);
-            const [activePanic, setActivePanic] = useState(null);
+            const [alerts, setAlerts] = useState([]);
             const mapRef = useRef(null);
             const markersRef = useRef({});
             const remoteVideo = useRef(null);
             const peerRef = useRef(null);
 
             useEffect(() => {
+                // Mapa estilo Dashboard
                 if (!mapRef.current) {
                     mapRef.current = L.map('map', { zoomControl: false, attributionControl: false }).setView([-38.0055, -57.5426], 14);
-                    // Usamos un tile layer que funcione bien con el filtro
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapRef.current);
-                    setTimeout(() => mapRef.current.invalidateSize(), 500);
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapRef.current);
                 }
 
+                // Peer Receptor (War Room)
                 const peer = new Peer('WAR_ROOM_CENTRAL');
                 peer.on('call', call => {
                     call.answer();
@@ -86,17 +69,17 @@
                 });
                 peerRef.current = peer;
 
-                // Sincronización de unidades y mapa
+                // Sync Unidades y Alertas
                 const timer = setInterval(async () => {
-                    const { data } = await supabase.from('sentinel_units').select('*').eq('is_online', true);
-                    if (data) {
-                        setUnits(data);
-                        data.forEach(u => {
+                    const { data: unitsData } = await supabase.from('sentinel_units').select('*').eq('is_online', true);
+                    if (unitsData) {
+                        setUnits(unitsData);
+                        unitsData.forEach(u => {
                             if (u.lat && u.lng) {
                                 if (!markersRef.current[u.id]) {
-                                    markersRef.current[u.id] = L.circleMarker([u.lat, u.lng], {
-                                        radius: 6, color: '#fff', fillColor: '#00f2ff', fillOpacity: 1, weight: 2
-                                    }).addTo(mapRef.current);
+                                    markersRef.current[u.id] = L.marker([u.lat, u.lng], {
+                                        icon: L.divIcon({ className: 'unit-dot' })
+                                    }).addTo(mapRef.current).bindTooltip(u.unit_name, { permanent: true, direction: 'top' });
                                 } else {
                                     markersRef.current[u.id].setLatLng([u.lat, u.lng]);
                                 }
@@ -105,71 +88,119 @@
                     }
                 }, 3000);
 
+                const sub = supabase.channel('realtime_alerts').on('postgres_changes', { event: 'INSERT', table: 'sentinel_alerts' }, async (p) => {
+                    setAlerts(prev => [p.new, ...prev]);
+                }).subscribe();
+
                 return () => { clearInterval(timer); peer.destroy(); };
             }, []);
 
             return (
                 <div className="relative h-full w-full bg-black">
                     <div id="map"></div>
+                    
+                    <div className="hud-container">
+                        <header className="header-core px-6 panel">
+                            <h1 className="text-2xl font-black italic tracking-tighter">CORE CONTROL CENTER</h1>
+                            <div className="text-[10px] text-right">
+                                <p className="text-cyan-400">● REALTIME_ACTIVO</p>
+                                <p className="opacity-50">LOCATION: SECTOR_MDQ</p>
+                            </div>
+                        </header>
 
-                    <div className="hud-overlay flex justify-between items-start">
-                        {/* HEADER */}
-                        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[200]">
-                            <h1 className="text-2xl font-black italic tracking-[1em] text-cyan-400 drop-shadow-lg">CORE CONTROL CENTER</h1>
-                            <div className="h-[2px] bg-cyan-500 w-full animate-pulse mt-1"></div>
-                        </div>
-
-                        {/* LEFT: RED OPERATIVA */}
-                        <div className="cyber-card w-72 h-[60%] mt-20 p-4">
-                            <h2 className="text-[10px] tracking-widest text-white/50 mb-4 uppercase">System_Nodes // Real-Time</h2>
-                            <div className="space-y-3">
-                                {units.map(u => (
-                                    <div key={u.id} className="border-l-2 border-cyan-500 bg-cyan-950/20 p-2 flex justify-between items-center">
-                                        <div className="flex flex-col">
-                                            <span className="text-[11px] font-bold">{u.unit_name}</span>
-                                            <span className="text-[8px] opacity-40">LAT: {u.lat?.toFixed(3)} | LNG: {u.lng?.toFixed(3)}</span>
+                        <aside className="panel flex flex-col gap-4">
+                            <div>
+                                <h2 className="text-[11px] border-b border-cyan-900 mb-2">[MISSION_LOG]</h2>
+                                <div className="text-[10px] space-y-2 opacity-80">
+                                    {units.map(u => (
+                                        <div key={u.id} className="border-l border-cyan-500 pl-2">
+                                            <p className="font-bold">{u.unit_name}</p>
+                                            <p className="text-[8px]">ID: {u.peer_id.substring(0,8)} | STATUS: OK</p>
                                         </div>
-                                        <div className="w-2 h-2 bg-cyan-500 rounded-full shadow-[0_0_5px_cyan]"></div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* RIGHT: VIDEO & DIAGNOSTICS */}
-                        <div className="flex flex-col gap-4 mt-20">
-                            <div className={`cyber-card w-96 aspect-video overflow-hidden ${activePanic ? 'panic-active' : ''}`}>
-                                <video ref={remoteVideo} autoPlay playsInline className="w-full h-full object-cover grayscale contrast-150" />
-                                <div className="absolute top-2 right-2 flex gap-2">
-                                    <span className="text-[8px] bg-red-600 px-1 text-white animate-pulse">REC</span>
-                                    <span className="text-[8px] bg-black/80 px-1">CAM_01</span>
-                                </div>
-                                {!remoteVideo.current?.srcObject && (
-                                    <div className="absolute inset-0 flex items-center justify-center text-[10px] opacity-20">NO_SIGNAL_CONNECTED</div>
-                                )}
-                            </div>
-
-                            <div className="cyber-card w-96 p-4">
-                                <h3 className="text-[9px] mb-2 underline opacity-50">Mission_Log</h3>
-                                <div className="text-[10px] space-y-1 font-mono">
-                                    <p className="text-cyan-400">> TRÁFICO: NORMAL</p>
-                                    <p className="text-cyan-400">> NODOS ACTIVOS: {units.length}</p>
-                                    <p className="text-cyan-400">> SISTEMA: OPERATIVO</p>
+                                    ))}
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                            <div className="mt-auto">
+                                <h2 className="text-[11px] border-b border-cyan-900 mb-2">[SYS_HEALTH]</h2>
+                                <div className="text-[9px] space-y-1 opacity-60 italic">
+                                    <p>◆ Honey Empire: [ONLINE]</p>
+                                    <p>◆ Core Security: [SECURE]</p>
+                                    <p>◆ Smart Barber: [ACTIVE]</p>
+                                </div>
+                            </div>
+                        </aside>
 
-                    {/* BARRA INFERIOR */}
-                    <div className="absolute bottom-6 left-6 z-[200] cyber-card p-2 px-6">
-                        <span className="text-[10px] tracking-widest">MAR DEL PLATA VIVA // SECTOR_CENTRO</span>
+                        <div></div> {/* Espacio central para mapa */}
+
+                        <aside className="panel flex flex-col">
+                            <h2 className="text-[11px] mb-2">[SNTNL_CAM_01]</h2>
+                            <div className="video-box">
+                                <div className="scanline"></div>
+                                <video ref={remoteVideo} autoPlay playsInline className="w-full h-full object-cover grayscale" />
+                                <div className="absolute top-2 left-2 flex items-center gap-1">
+                                    <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></div>
+                                    <span className="text-[8px] font-bold">LIVE</span>
+                                </div>
+                            </div>
+                            
+                            <div className="flex-grow mt-4">
+                                <h2 className="text-[11px] border-b border-cyan-900 mb-2">[INCIDENT_FEED]</h2>
+                                <div className="text-[9px] space-y-2 overflow-y-auto max-h-[300px]">
+                                    {alerts.map((a, i) => (
+                                        <p key={i} className="text-red-500 animate-pulse">> ALERT_ID: {a.id} | UNIT_P_ON</p>
+                                    ))}
+                                    <p className="opacity-40">> Scanning MDQ_SECTOR_01...</p>
+                                </div>
+                            </div>
+                        </aside>
                     </div>
+                </div>
+            );
+        };
+
+        const MobileUnit = () => {
+            const [myId, setMyId] = useState('');
+            const myVideo = useRef(null);
+            const peerRef = useRef(null);
+
+            useEffect(() => {
+                const peer = new Peer();
+                peer.on('open', id => {
+                    setMyId(id);
+                    supabase.from('sentinel_units').upsert({ unit_name: 'MÓVIL_RESCATE', peer_id: id, is_online: true });
+                    navigator.geolocation.watchPosition(p => {
+                        supabase.from('sentinel_units').update({ lat: p.coords.latitude, lng: p.coords.longitude }).eq('peer_id', id);
+                    });
+                });
+                peerRef.current = peer;
+
+                navigator.mediaDevices.getUserMedia({ video: true, audio: false }).then(s => {
+                    if (myVideo.current) myVideo.current.srcObject = s;
+                });
+            }, []);
+
+            const sendPanic = async () => {
+                await supabase.from('sentinel_alerts').insert([{ unit_id: myId }]);
+                peerRef.current.call('WAR_ROOM_CENTRAL', myVideo.current.srcObject);
+            };
+
+            return (
+                <div className="h-screen w-screen bg-black flex flex-col p-6 items-center justify-between">
+                    <div className="w-full border border-cyan-500 aspect-video overflow-hidden">
+                        <video ref={myVideo} autoPlay playsInline muted className="w-full h-full object-cover grayscale" />
+                    </div>
+                    <div className="text-center">
+                        <h1 className="text-2xl font-bold italic tracking-widest">SENTINEL UNIT</h1>
+                        <p className="text-[10px] opacity-50 uppercase mt-1">Status: Encrypted_Transmission</p>
+                    </div>
+                    <button onClick={sendPanic} className="w-full py-12 panic-btn text-4xl rounded-xl border-4 border-red-900">PÁNICO</button>
                 </div>
             );
         };
 
         const App = () => {
             const isPC = !/iPhone|Android|iPad/i.test(navigator.userAgent);
-            return isPC ? <WarRoom /> : <div className="p-10 text-center">MODO UNIDAD: USE EL CÓDIGO ANTERIOR</div>;
+            return isPC ? <WarRoom /> : <MobileUnit />;
         };
 
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
