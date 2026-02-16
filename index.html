@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENTINEL V4.9 - CENTRAL MONITOR</title>
+    <title>SENTINEL V5.0 - CENTRAL MONITOR</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
@@ -33,50 +33,58 @@
             const [myId, setMyId] = useState('');
             const [units, setUnits] = useState([]);
             const [isPC, setIsPC] = useState(false);
+            const [isReady, setIsReady] = useState(false);
             const myVideo = useRef(null);
             const remoteVideo = useRef(null);
             const peerInstance = useRef(null);
 
-            useEffect(() => {
-                const device = !/iPhone|Android|iPad/i.test(navigator.userAgent);
-                setIsPC(device);
-
-                const init = async () => {
-                    // 1. Activar cámara siempre para emitir
+            // FUNCIÓN PARA ARRANCAR TODO CON UN CLIC (Evita bloqueo de navegador)
+            const initializeSystem = async () => {
+                try {
                     const stream = await navigator.mediaDevices.getUserMedia({ 
                         video: { facingMode: isPC ? "user" : "environment" }, 
                         audio: false 
                     });
                     if (myVideo.current) myVideo.current.srcObject = stream;
+                    setIsReady(true);
+                } catch (e) {
+                    alert("Por favor, permite el acceso a la cámara.");
+                }
+            };
 
-                    const peer = new Peer({
-                        config: {'iceServers': [{ url: 'stun:stun.l.google.com:19302' }]}
+            useEffect(() => {
+                const device = !/iPhone|Android|iPad/i.test(navigator.userAgent);
+                setIsPC(device);
+
+                const peer = new Peer({
+                    config: {'iceServers': [
+                        { url: 'stun:stun.l.google.com:19302' },
+                        { url: 'stun:stun1.l.google.com:19302' }
+                    ]}
+                });
+
+                peer.on('open', async (id) => {
+                    setMyId(id);
+                    await supabaseClient.from('sentinel_units').upsert({ 
+                        unit_name: device ? "CENTRAL_WAR_ROOM" : `MOVIL_${id.substring(0,4)}`, 
+                        peer_id: id,
+                        is_online: true 
                     });
+                });
 
-                    peer.on('open', async (id) => {
-                        setMyId(id);
-                        await supabaseClient.from('sentinel_units').upsert({ 
-                            unit_name: device ? "CENTRAL_WAR_ROOM" : `MOVIL_${id.substring(0,4)}`, 
-                            peer_id: id,
-                            is_online: true 
-                        });
+                peer.on('call', call => {
+                    // Responder con nuestro stream (aunque sea vacío para que WebRTC no falle)
+                    call.answer(myVideo.current?.srcObject); 
+                    call.on('stream', remoteStream => {
+                        if (remoteVideo.current) {
+                            remoteVideo.current.srcObject = remoteStream;
+                            remoteVideo.current.play().catch(console.error);
+                        }
                     });
+                });
 
-                    // 2. RECIBIR LLAMADA (Solo la central procesa el video entrante)
-                    peer.on('call', call => {
-                        // Respondemos pero NO enviamos nuestro video (stream: null o vacio)
-                        call.answer(); 
-                        call.on('stream', remoteStream => {
-                            if (device && remoteVideo.current) {
-                                remoteVideo.current.srcObject = remoteStream;
-                            }
-                        });
-                    });
+                peerInstance.current = peer;
 
-                    peerInstance.current = peer;
-                };
-
-                init();
                 const interval = setInterval(fetchUnits, 3000);
                 return () => clearInterval(interval);
             }, [isPC]);
@@ -87,60 +95,70 @@
             };
 
             const connectTo = (remoteId) => {
-                // La central llama pidiendo el video de la unidad
+                if (!isReady) {
+                    alert("Primero haz clic en 'INICIALIZAR' para activar el visor.");
+                    return;
+                }
+                // La central llama pidiendo el video
                 const call = peerInstance.current.call(remoteId, myVideo.current.srcObject);
                 call.on('stream', stream => {
-                    if (remoteVideo.current) remoteVideo.current.srcObject = stream;
+                    if (remoteVideo.current) {
+                        remoteVideo.current.srcObject = stream;
+                        remoteVideo.current.play().catch(console.error);
+                    }
                 });
             };
 
             return (
                 <div className="p-4 bg-black min-h-screen text-cyan-400 font-mono">
-                    <div className="flex justify-between border-b border-cyan-900 mb-6 pb-2">
-                        <h1 className="text-xl font-bold tracking-widest text-white">SENTINEL <span className="text-cyan-500 font-light">V4.9</span></h1>
+                    <div className="flex justify-between border-b border-cyan-900 mb-6 pb-2 items-center">
+                        <h1 className="text-xl font-bold tracking-widest text-white italic">SENTINEL <span className="text-cyan-500 font-light">V5.0</span></h1>
+                        {!isReady && (
+                            <button onClick={initializeSystem} className="bg-red-600 text-white text-[10px] px-4 py-1 animate-pulse font-bold border border-white">
+                                ⚠️ INICIALIZAR SISTEMA
+                            </button>
+                        )}
                         <div className="text-right">
-                            <span className="block text-[10px] text-green-500">SISTEMA ENCRIPTADO</span>
-                            <span className="text-[8px] text-gray-500">ID_NODE: {myId}</span>
+                            <span className="block text-[10px] text-green-500">SISTEMA EN LINEA</span>
+                            <span className="text-[8px] text-gray-500">ID: {myId.substring(0,6)}</span>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        {/* LISTA DE UNIDADES - Solo visible en PC */}
-                        {isPC && (
-                            <div className="lg:col-span-3 space-y-4">
-                                <div className="border border-cyan-900 p-3 bg-cyan-950/10">
-                                    <p className="text-[10px] font-bold text-white mb-4 uppercase underline">Unidades Operativas</p>
-                                    <div className="space-y-2">
-                                        {units.filter(u => u.unit_name.includes("MOVIL")).map(u => (
-                                            <button key={u.id} onClick={() => connectTo(u.peer_id)} className="w-full text-left border border-cyan-500/30 p-2 text-[10px] hover:bg-cyan-500 hover:text-black transition-all flex justify-between items-center">
-                                                <span>📡 {u.unit_name}</span>
-                                                <span className="text-[8px] animate-pulse">● RECIBIR</span>
-                                            </button>
-                                        ))}
-                                    </div>
+                        {/* LISTA DE UNIDADES */}
+                        <div className="lg:col-span-3 space-y-4">
+                            <div className="border border-cyan-900 p-3 bg-cyan-950/10 shadow-[0_0_15px_rgba(0,242,255,0.05)]">
+                                <p className="text-[10px] font-bold text-white mb-4 uppercase underline">Unidades Detectadas</p>
+                                <div className="space-y-2">
+                                    {units.filter(u => u.peer_id !== myId).length === 0 && <p className="text-[9px] text-gray-600">Buscando señales...</p>}
+                                    {units.filter(u => u.peer_id !== myId).map(u => (
+                                        <button key={u.id} onClick={() => connectTo(u.peer_id)} className="w-full text-left border border-cyan-500/30 p-2 text-[10px] hover:bg-cyan-500 hover:text-black transition-all flex justify-between items-center group">
+                                            <span>📡 {u.unit_name}</span>
+                                            <span className="text-[8px] group-hover:font-bold">CONECTAR</span>
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
-                        )}
+                        </div>
 
-                        {/* VISOR PRINCIPAL (Solo Central) o PREVIEW (Móvil) */}
-                        <div className={`${isPC ? 'lg:col-span-6' : 'lg:col-span-12'} monitor-frame bg-gray-950 min-h-[300px]`}>
+                        {/* VISOR PRINCIPAL */}
+                        <div className={`${isPC ? 'lg:col-span-6' : 'lg:col-span-12'} monitor-frame bg-gray-950 min-h-[300px] shadow-[0_0_30px_rgba(255,0,0,0.05)]`}>
                             <div className="scanline"></div>
-                            {isPC ? (
-                                <video ref={remoteVideo} autoPlay playsInline className="w-full aspect-video object-cover" />
-                            ) : (
-                                <div className="flex items-center justify-center h-full text-[10px] text-cyan-800 text-center p-10">
-                                    MODO EMISOR ACTIVO<br/>TRANSMITIENDO A CENTRAL...
+                            <video ref={remoteVideo} autoPlay playsInline className="w-full aspect-video object-cover bg-black" />
+                            {!isPC && (
+                                <div className="absolute inset-0 flex items-center justify-center text-[10px] text-cyan-800 text-center p-10 bg-black/60 pointer-events-none">
+                                    MODO EMISOR ACTIVO<br/>TRANSMITIENDO HACIA CENTRAL...
                                 </div>
                             )}
-                            <div className="absolute bottom-0 left-0 w-full bg-black/80 p-1 text-[8px] flex justify-between px-2">
+                            <div className="absolute bottom-0 left-0 w-full bg-black/80 p-1 text-[8px] flex justify-between px-2 border-t border-cyan-900/50">
                                 <span>{isPC ? "RECEPTOR_CENTRAL" : "UNIDAD_MOVIL_STREAMING"}</span>
-                                <span className="text-red-500">● LIVE</span>
+                                <span className="text-red-500 font-bold animate-pulse">● LIVE FEED</span>
                             </div>
                         </div>
 
                         {/* TU CÁMARA (Monitor de referencia) */}
                         <div className="lg:col-span-3">
-                            <div className="border border-cyan-900 p-1 bg-black">
+                            <div className="border border-cyan-900 p-1 bg-black shadow-lg">
                                 <video ref={myVideo} autoPlay playsInline muted className="w-full aspect-video grayscale contrast-125 border border-cyan-900/50" />
                                 <p className="text-[9px] mt-1 text-center text-cyan-600 uppercase italic">
                                     {isPC ? "Monitor Operador" : "Vista de Cámara"}
