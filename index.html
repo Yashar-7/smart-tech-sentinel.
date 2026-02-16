@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SENTINEL V6.1 - TACTICAL HUD</title>
+    <title>SENTINEL V6.2 - CORE RESTORED</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -14,39 +14,46 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
-        :root { --neon: #00f2ff; --panic: #ff003c; --bg: #010103; }
-        body, html, #root { height: 100%; margin: 0; background: var(--bg); color: var(--neon); font-family: 'Courier New', monospace; overflow: hidden; }
+        :root { --neon: #00f2ff; --panic: #ff003c; --bg: #010203; }
+        body, html, #root { height: 100%; margin: 0; background: var(--bg); overflow: hidden; color: var(--neon); font-family: 'Share Tech Mono', monospace; }
         
-        /* ESTILO CYBER MAP */
+        /* EL MAPA TÁCTICO DE VERDAD */
         #map { 
-            position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1;
-            filter: invert(100%) hue-rotate(170deg) brightness(0.5) contrast(1.3);
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;
+            /* El filtro secreto para el look Cyberpunk */
+            filter: invert(100%) hue-rotate(185deg) brightness(0.4) contrast(1.4) saturate(1.5);
             background: #000 !important;
         }
 
-        .cyber-hud { 
-            position: relative; z-index: 10; pointer-events: none;
-            height: 100%; padding: 20px; display: grid;
-            grid-template-columns: 300px 1fr 350px; grid-template-rows: 1fr 200px; gap: 20px;
-        }
-        
-        .panel { 
-            pointer-events: auto; background: rgba(0, 5, 10, 0.85);
-            border: 1px solid rgba(0, 242, 255, 0.3); backdrop-filter: blur(10px);
-            box-shadow: 0 0 20px rgba(0,0,0,0.5), inset 0 0 15px rgba(0, 242, 255, 0.05);
+        /* HUD - PANELES FLOTANTES ESTILO CORE CONTROL */
+        .hud-overlay {
+            position: absolute; inset: 0; z-index: 100; pointer-events: none;
+            padding: 25px; display: flex; flex-direction: column; justify-content: justify-between;
         }
 
-        .scanline {
-            width: 100%; height: 2px; background: rgba(0, 242, 255, 0.1);
-            position: absolute; animation: scan 4s linear infinite; z-index: 20;
+        .cyber-card {
+            pointer-events: auto;
+            background: rgba(0, 15, 20, 0.75);
+            border: 1px solid var(--neon);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.1), inset 0 0 20px rgba(0, 242, 255, 0.05);
+            backdrop-filter: blur(8px);
+            position: relative;
         }
-        @keyframes scan { from { top: 0; } to { top: 100%; } }
-        
-        .panic-overlay { 
-            position: absolute; inset: 0; z-index: 100; pointer-events: none;
-            border: 10px solid #ff003c; animation: panic-border 0.5s infinite;
+
+        .cyber-card::before {
+            content: ""; position: absolute; top: -2px; left: 10%; width: 80%; height: 1px; background: var(--neon); box-shadow: 0 0 10px var(--neon);
         }
-        @keyframes panic-border { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        .panic-active {
+            animation: panic-flash 0.5s infinite;
+            border: 2px solid var(--panic) !important;
+            box-shadow: 0 0 30px var(--panic) !important;
+        }
+
+        @keyframes panic-flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* Iconos de Unidades */
+        .unit-marker { background: var(--neon); border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px var(--neon); }
     </style>
 </head>
 <body>
@@ -65,10 +72,10 @@
             const peerRef = useRef(null);
 
             useEffect(() => {
-                // Forzar carga de mapa
                 if (!mapRef.current) {
                     mapRef.current = L.map('map', { zoomControl: false, attributionControl: false }).setView([-38.0055, -57.5426], 14);
-                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapRef.current);
+                    // Usamos un tile layer que funcione bien con el filtro
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapRef.current);
                     setTimeout(() => mapRef.current.invalidateSize(), 500);
                 }
 
@@ -79,6 +86,7 @@
                 });
                 peerRef.current = peer;
 
+                // Sincronización de unidades y mapa
                 const timer = setInterval(async () => {
                     const { data } = await supabase.from('sentinel_units').select('*').eq('is_online', true);
                     if (data) {
@@ -86,9 +94,9 @@
                         data.forEach(u => {
                             if (u.lat && u.lng) {
                                 if (!markersRef.current[u.id]) {
-                                    markersRef.current[u.id] = L.circleMarker([u.lat, u.lng], { 
-                                        color: '#00f2ff', fillColor: '#00f2ff', fillOpacity: 0.8, radius: 5 
-                                    }).addTo(mapRef.current).bindTooltip(u.unit_name, { permanent: true, direction: 'top', className: 'cyber-label' });
+                                    markersRef.current[u.id] = L.circleMarker([u.lat, u.lng], {
+                                        radius: 6, color: '#fff', fillColor: '#00f2ff', fillOpacity: 1, weight: 2
+                                    }).addTo(mapRef.current);
                                 } else {
                                     markersRef.current[u.id].setLatLng([u.lat, u.lng]);
                                 }
@@ -97,72 +105,71 @@
                     }
                 }, 3000);
 
-                // Escuchar pánico
-                const sub = supabase.channel('alerts').on('postgres_changes', { event: 'INSERT', table: 'sentinel_alerts' }, async (payload) => {
-                    const { data } = await supabase.from('sentinel_units').select('unit_name').eq('peer_id', payload.new.unit_id).single();
-                    if(data) {
-                        setActivePanic(data.unit_name);
-                        setTimeout(() => setActivePanic(null), 10000);
-                    }
-                }).subscribe();
-
-                return () => { clearInterval(timer); peer.destroy(); supabase.removeChannel(sub); };
+                return () => { clearInterval(timer); peer.destroy(); };
             }, []);
 
             return (
-                <div className="relative h-full w-full">
+                <div className="relative h-full w-full bg-black">
                     <div id="map"></div>
-                    {activePanic && <div className="panic-overlay"></div>}
 
-                    <div className="cyber-hud">
-                        {/* Panel Izquierdo: Unidades */}
-                        <div className="panel p-4 flex flex-col">
-                            <h2 className="text-[12px] font-bold border-b border-cyan-500 mb-4 tracking-widest">RED_OPERATIVA</h2>
-                            <div className="flex-grow space-y-2 overflow-y-auto">
+                    <div className="hud-overlay flex justify-between items-start">
+                        {/* HEADER */}
+                        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[200]">
+                            <h1 className="text-2xl font-black italic tracking-[1em] text-cyan-400 drop-shadow-lg">CORE CONTROL CENTER</h1>
+                            <div className="h-[2px] bg-cyan-500 w-full animate-pulse mt-1"></div>
+                        </div>
+
+                        {/* LEFT: RED OPERATIVA */}
+                        <div className="cyber-card w-72 h-[60%] mt-20 p-4">
+                            <h2 className="text-[10px] tracking-widest text-white/50 mb-4 uppercase">System_Nodes // Real-Time</h2>
+                            <div className="space-y-3">
                                 {units.map(u => (
-                                    <div key={u.id} className="p-2 border border-cyan-500/20 bg-cyan-500/5 flex justify-between items-center">
-                                        <span className="text-[10px]">{u.unit_name}</span>
-                                        <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></div>
+                                    <div key={u.id} className="border-l-2 border-cyan-500 bg-cyan-950/20 p-2 flex justify-between items-center">
+                                        <div className="flex flex-col">
+                                            <span className="text-[11px] font-bold">{u.unit_name}</span>
+                                            <span className="text-[8px] opacity-40">LAT: {u.lat?.toFixed(3)} | LNG: {u.lng?.toFixed(3)}</span>
+                                        </div>
+                                        <div className="w-2 h-2 bg-cyan-500 rounded-full shadow-[0_0_5px_cyan]"></div>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Espacio Central Libre (Mapa) */}
-                        <div></div>
-
-                        {/* Panel Derecho: Video y Consola */}
-                        <div className="flex flex-col gap-4">
-                            <div className="panel relative aspect-video overflow-hidden">
-                                <div className="scanline"></div>
-                                <video ref={remoteVideo} autoPlay playsInline className="w-full h-full object-cover grayscale contrast-125" />
-                                <div className="absolute bottom-2 left-2 text-[8px] bg-black/80 px-1">LIVE_FEED_SIGNAL</div>
+                        {/* RIGHT: VIDEO & DIAGNOSTICS */}
+                        <div className="flex flex-col gap-4 mt-20">
+                            <div className={`cyber-card w-96 aspect-video overflow-hidden ${activePanic ? 'panic-active' : ''}`}>
+                                <video ref={remoteVideo} autoPlay playsInline className="w-full h-full object-cover grayscale contrast-150" />
+                                <div className="absolute top-2 right-2 flex gap-2">
+                                    <span className="text-[8px] bg-red-600 px-1 text-white animate-pulse">REC</span>
+                                    <span className="text-[8px] bg-black/80 px-1">CAM_01</span>
+                                </div>
+                                {!remoteVideo.current?.srcObject && (
+                                    <div className="absolute inset-0 flex items-center justify-center text-[10px] opacity-20">NO_SIGNAL_CONNECTED</div>
+                                )}
                             </div>
 
-                            <div className="panel flex-grow p-4 overflow-hidden flex flex-col">
-                                <h2 className="text-[10px] opacity-50 mb-2 underline">INCIDENT_LOG</h2>
-                                <div className="flex-grow text-[9px] space-y-1 font-mono opacity-80">
-                                    <p className="text-cyan-300">> SYSTEM_BOOT_V6.1... OK</p>
-                                    <p className="text-cyan-300">> ENCRYPTED_LINK... ESTABLISHED</p>
-                                    {activePanic && <p className="text-red-500 animate-pulse">> ALERT: CRITICAL_PANIC_FROM_{activePanic}</p>}
+                            <div className="cyber-card w-96 p-4">
+                                <h3 className="text-[9px] mb-2 underline opacity-50">Mission_Log</h3>
+                                <div className="text-[10px] space-y-1 font-mono">
+                                    <p className="text-cyan-400">> TRÁFICO: NORMAL</p>
+                                    <p className="text-cyan-400">> NODOS ACTIVOS: {units.length}</p>
+                                    <p className="text-cyan-400">> SISTEMA: OPERATIVO</p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[200] text-[10px] tracking-[0.5em] opacity-30">
-                        MAR DEL PLATA VIVA // CORE_SENTINEL
+                    {/* BARRA INFERIOR */}
+                    <div className="absolute bottom-6 left-6 z-[200] cyber-card p-2 px-6">
+                        <span className="text-[10px] tracking-widest">MAR DEL PLATA VIVA // SECTOR_CENTRO</span>
                     </div>
                 </div>
             );
         };
 
-        // ... (El componente MobileUnit se mantiene igual al anterior) ...
-        const MobileUnit = () => { /* Código del móvil del mensaje anterior */ };
-
         const App = () => {
             const isPC = !/iPhone|Android|iPad/i.test(navigator.userAgent);
-            return isPC ? <WarRoom /> : <MobileUnit />;
+            return isPC ? <WarRoom /> : <div className="p-10 text-center">MODO UNIDAD: USE EL CÓDIGO ANTERIOR</div>;
         };
 
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
