@@ -3,136 +3,162 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENTINEL V5.1 - PANIC MODE</title>
+    <title>SENTINEL V5.2 - CYBERPUNK IDENTITY</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
-        :root { --neon-cyan: #00f2ff; --dark-bg: #050508; }
-        body { margin: 0; background: var(--dark-bg); color: var(--neon-cyan); font-family: 'monospace'; overflow: hidden; }
-        .panic-alert { animation: panic-bg 0.5s infinite; }
-        @keyframes panic-bg { 0% { background: #000; } 50% { background: #450a0a; } 100% { background: #000; } }
-        .scanline { width: 100%; height: 2px; background: rgba(0, 242, 255, 0.1); position: absolute; top: 0; animation: scan 4s linear infinite; z-index: 10; pointer-events: none; }
-        @keyframes scan { from { top: 0; } to { top: 100%; } }
+        :root { --neon: #00f2ff; --panic: #ff003c; --bg: #020203; }
+        body { background: var(--bg); color: var(--neon); font-family: 'Courier New', monospace; overflow: hidden; }
+        .cyber-border { border: 1px solid rgba(0, 242, 255, 0.3); box-shadow: 0 0 15px rgba(0, 242, 255, 0.1); }
+        .panic-mode { animation: flash 0.3s infinite; border: 2px solid var(--panic) !important; }
+        @keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.5; } }
+        .grid-bg { background-image: linear-gradient(rgba(0, 242, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 242, 255, 0.05) 1px, transparent 1px); background-size: 30px 30px; }
     </style>
 </head>
-<body id="main-body">
+<body class="grid-bg">
     <div id="root"></div>
-
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
 
         const SUPABASE_URL = 'https://svpurpvbiujhcbiugrkh.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2cHVycHZiaXVqaGNiaXVncmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NDgzMTUsImV4cCI6MjA4MzMyNDMxNX0.AivKJ0_N0z_4T4vLNfUcE2hepJ1XXOO8-4fSA3PJXdc';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const WarRoom = () => {
-            const [myId, setMyId] = useState('');
-            const [units, setUnits] = useState([]);
+        const SentinelApp = () => {
+            const [unitName, setUnitName] = useState(localStorage.getItem('sentinel_name') || '');
             const [isPC] = useState(!/iPhone|Android|iPad/i.test(navigator.userAgent));
-            const [isReady, setIsReady] = useState(false);
-            const [panicMode, setPanicMode] = useState(false);
+            const [units, setUnits] = useState([]);
+            const [panicUnit, setPanicUnit] = useState(null);
             const myVideo = useRef(null);
             const remoteVideo = useRef(null);
-            const peerInstance = useRef(null);
+            const peerRef = useRef(null);
 
             useEffect(() => {
-                const init = async () => {
-                    const peer = new Peer({ config: {'iceServers': [{ url: 'stun:stun.l.google.com:19302' }]} });
-                    peer.on('open', async (id) => {
-                        setMyId(id);
-                        await supabaseClient.from('sentinel_units').upsert({ 
-                            unit_name: isPC ? "CENTRAL_WAR_ROOM" : `UNIDAD_${id.substring(0,4)}`, 
-                            peer_id: id, is_online: true 
-                        });
-                    });
-                    peer.on('call', call => {
-                        call.answer(myVideo.current?.srcObject);
-                        call.on('stream', s => { if(remoteVideo.current) remoteVideo.current.srcObject = s; });
-                    });
-                    peerInstance.current = peer;
-                };
-                init();
+                if (!unitName && !isPC) {
+                    const name = prompt("IDENTIFIQUE LA UNIDAD (Ej: ALMACEN, BARBERIA):");
+                    if (name) {
+                        setUnitName(name.toUpperCase());
+                        localStorage.setItem('sentinel_name', name.toUpperCase());
+                    }
+                }
+                initPeer();
                 
-                // Suscribirse a alertas en tiempo real
-                const channel = supabaseClient
-                    .channel('alerts')
+                const channel = supabase.channel('realtime_sentinel')
                     .on('postgres_changes', { event: 'INSERT', table: 'sentinel_alerts' }, payload => {
-                        if (isPC) triggerPanic();
-                    })
-                    .subscribe();
+                        handleIncomingAlert(payload.new);
+                    }).subscribe();
 
                 const interval = setInterval(fetchUnits, 3000);
-                return () => { clearInterval(interval); supabaseClient.removeChannel(channel); };
-            }, [isPC]);
+                return () => { clearInterval(interval); supabase.removeChannel(channel); };
+            }, [unitName]);
+
+            const initPeer = () => {
+                const peer = new Peer({ config: { 'iceServers': [{ url: 'stun:stun.l.google.com:19302' }] } });
+                peer.on('open', id => {
+                    const finalName = isPC ? "CENTRAL_WAR_ROOM" : unitName;
+                    supabase.from('sentinel_units').upsert({ unit_name: finalName, peer_id: id, is_online: true });
+                    
+                    if (!isPC) {
+                        navigator.geolocation.watchPosition(pos => {
+                            supabase.from('sentinel_units').update({ 
+                                lat: pos.coords.latitude, 
+                                lng: pos.coords.longitude 
+                            }).eq('peer_id', id);
+                        });
+                    }
+                });
+                peer.on('call', call => {
+                    call.answer(myVideo.current?.srcObject);
+                    call.on('stream', s => { if(remoteVideo.current) remoteVideo.current.srcObject = s; });
+                });
+                peerRef.current = peer;
+            };
 
             const fetchUnits = async () => {
-                const { data } = await supabaseClient.from('sentinel_units').select('*').eq('is_online', true);
+                const { data } = await supabase.from('sentinel_units').select('*').eq('is_online', true);
                 setUnits(data || []);
             };
 
-            const triggerPanic = () => {
-                setPanicMode(true);
-                const audio = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3'); // Sonido provisional
-                audio.play();
-                setTimeout(() => setPanicMode(false), 5000); // La alerta visual dura 5 segundos
+            const handleIncomingAlert = async (alertData) => {
+                const { data } = await supabase.from('sentinel_units').select('unit_name, peer_id').eq('peer_id', alertData.unit_id).single();
+                setPanicUnit(data?.unit_name || "DESCONOCIDO");
+                
+                // POP-UP AUTOMÁTICO: Si la central recibe alerta, intenta conectar video
+                if (isPC && data?.peer_id) {
+                    const call = peerRef.current.call(data.peer_id, myVideo.current.srcObject);
+                    call.on('stream', s => { if(remoteVideo.current) remoteVideo.current.srcObject = s; });
+                }
+                setTimeout(() => setPanicUnit(null), 10000);
             };
 
-            const sendAlert = async () => {
-                await supabaseClient.from('sentinel_alerts').insert([{ unit_id: myId, type: 'CRITICAL' }]);
-                alert("ALERTA ENVIADA A CENTRAL");
+            const sendPanic = async () => {
+                await supabase.from('sentinel_alerts').insert([{ unit_id: peerRef.current.id, type: 'CRITICAL' }]);
             };
 
-            const initialize = async () => {
+            const startCam = async () => {
                 const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                if (myVideo.current) myVideo.current.srcObject = s;
-                setIsReady(true);
+                myVideo.current.srcObject = s;
             };
 
             return (
-                <div className={`p-4 min-h-screen ${panicMode ? 'panic-alert' : 'bg-black'} transition-colors duration-300`}>
-                    <div className="scanline"></div>
-                    
-                    <div className="flex justify-between items-center border-b border-cyan-900 mb-4 pb-2">
-                        <h1 className="text-xl font-bold tracking-tighter">SENTINEL <span className={panicMode ? 'text-red-500' : 'text-cyan-500'}>V5.1</span></h1>
-                        <div className="flex gap-2">
-                            {!isReady && <button onClick={initialize} className="bg-cyan-600 text-black px-3 py-1 text-[10px] font-bold">INICIALIZAR</button>}
-                            {!isPC && isReady && <button onClick={sendAlert} className="bg-red-600 text-white px-3 py-1 text-[10px] font-bold border border-white pulse-red">PÁNICO</button>}
+                <div className="p-6 h-screen flex flex-col">
+                    <header className="flex justify-between items-center mb-6 border-b border-cyan-500/30 pb-2">
+                        <div className="text-2xl font-black tracking-tighter italic">SENTINEL_V5.2</div>
+                        <div className="flex gap-4 items-center">
+                            <span className="text-[10px] text-cyan-500/50">NODE: {unitName || 'CENTRAL'}</span>
+                            <button onClick={startCam} className="cyber-border px-4 py-1 text-[10px] bg-cyan-500/10 hover:bg-cyan-500 hover:text-black">INIT_SYSTEM</button>
                         </div>
-                    </div>
+                    </header>
 
-                    <div className="grid grid-cols-12 gap-4">
+                    <div className="grid grid-cols-12 gap-6 flex-grow overflow-hidden">
+                        {/* UNIDADES LATERALES */}
                         {isPC && (
-                            <div className="col-span-3 border border-cyan-900 p-2 bg-black/50">
-                                <p className="text-[9px] text-white underline mb-2 tracking-widest">RED OPERATIVA</p>
-                                {units.filter(u => u.peer_id !== myId).map(u => (
-                                    <button key={u.id} onClick={() => peerInstance.current.call(u.peer_id, myVideo.current.srcObject).on('stream', s => remoteVideo.current.srcObject = s)} 
-                                        className="w-full text-left border border-cyan-800 p-2 mb-2 text-[10px] hover:bg-cyan-500 hover:text-black">
-                                        🛰️ {u.unit_name}
-                                    </button>
+                            <div className="col-span-3 overflow-y-auto pr-2 space-y-4">
+                                <h3 className="text-[10px] opacity-50 underline uppercase">Unidades de Campo</h3>
+                                {units.filter(u => u.unit_name !== "CENTRAL_WAR_ROOM").map(u => (
+                                    <div key={u.id} className="cyber-border p-3 bg-black/40 relative group">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs font-bold">{u.unit_name}</span>
+                                            <button onClick={() => peerRef.current.call(u.peer_id, myVideo.current.srcObject).on('stream', s => remoteVideo.current.srcObject = s)} 
+                                                className="text-[9px] border border-cyan-500 px-2 py-0.5 hover:bg-cyan-500 hover:text-black">VIEW</button>
+                                        </div>
+                                        <div className="text-[8px] mt-2 opacity-40">GPS: {u.lat?.toFixed(4)}, {u.lng?.toFixed(4)}</div>
+                                    </div>
                                 ))}
                             </div>
                         )}
 
-                        <div className={`${isPC ? 'col-span-6' : 'col-span-12'} border ${panicMode ? 'border-red-500' : 'border-cyan-900'} bg-black relative`}>
-                            {panicMode && <div className="absolute inset-0 z-20 flex items-center justify-center bg-red-900/20"><h2 className="text-red-500 text-2xl font-black animate-ping text-center">!!! ALERTA CRÍTICA !!!</h2></div>}
-                            <video ref={remoteVideo} autoPlay playsInline className="w-full aspect-video object-cover" />
+                        {/* VISOR PRINCIPAL */}
+                        <div className={`${isPC ? 'col-span-6' : 'col-span-12'} relative cyber-border bg-black`}>
+                            {panicUnit && (
+                                <div className="absolute inset-0 z-50 bg-red-950/40 backdrop-blur-sm flex flex-col items-center justify-center border-4 border-red-600 animate-pulse">
+                                    <h2 className="text-4xl font-black text-white italic">ALERTA: {panicUnit}</h2>
+                                    <p className="text-red-500 font-bold tracking-[1em]">INTRUSIÓN DETECTADA</p>
+                                </div>
+                            )}
+                            <video ref={remoteVideo} autoPlay playsInline className="w-full h-full object-cover grayscale brightness-125" />
                         </div>
 
-                        <div className={`${isPC ? 'col-span-3' : 'col-span-12'} border border-cyan-900 p-2 bg-black`}>
-                            <video ref={myVideo} autoPlay playsInline muted className="w-full aspect-video grayscale contrast-150 border border-cyan-900/30" />
-                            <p className="text-[9px] text-center mt-2">MONITOR_LOCAL</p>
+                        {/* CONTROL LOCAL / MÓVIL */}
+                        <div className={`${isPC ? 'col-span-3' : 'col-span-12'} flex flex-col gap-4`}>
+                            <div className="cyber-border p-1 bg-black">
+                                <video ref={myVideo} autoPlay playsInline muted className="w-full aspect-video grayscale border border-cyan-500/20" />
+                            </div>
+                            {!isPC && (
+                                <button onClick={sendPanic} className="flex-grow bg-red-600 text-white font-black text-2xl italic border-4 border-white active:bg-white active:text-red-600 transition-all">
+                                    PÁNICO
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
             );
         };
 
-        ReactDOM.createRoot(document.getElementById('root')).render(<WarRoom />);
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<SentinelApp />);
     </script>
 </body>
 </html>
