@@ -163,6 +163,7 @@
             transform: scale(1.05);
         }
         .fab-baliza:active { transform: scale(0.98); }
+        /* === Estilos añadidos solo para botones móvil (baliza/pánico). No modifican HUD, #map, .leaflet-* ni radar. === */
         .fab-panic {
             bottom: 96px;
             right: 24px;
@@ -817,7 +818,7 @@
             0%, 100% { box-shadow: 0 0 20px rgba(57, 255, 20, 0.5); }
             50% { box-shadow: 0 0 35px rgba(57, 255, 20, 0.9); }
         }
-        /* BALIZA LIVE: dentro del contenedor .cam-02-fallback existente */
+        /* === BALIZA LIVE: solo dentro de .cam-02-fallback. No toca HUD, filtros del mapa ni elementos del radar. === */
         .cam-02-wrap .cam-02-fallback .cam-02-baliza-content {
             display: none; position: absolute; inset: 0; z-index: 4;
             flex-direction: column; background: rgba(10, 10, 20, 0.98);
@@ -4180,7 +4181,7 @@
     iniciarRealtimeIncidentsPanic();
     ensureIncidentListPlaceholder();
 
-    // ——— Unidad móvil: baliza y pánico en este mismo dashboard cuando se detecta celular ———
+    /* ——— Lógica añadida: unidad móvil (baliza + pánico). Solo JS y detección isMobile(); no modifica HUD, mapa ni radar. ——— */
     var mobileBalizaWatchId = null;
     var BEACON_ID_MOBILE = 'UNIDAD_MOBILE';
 
