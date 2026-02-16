@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENTINEL V4.5 - AUTO LINK</title>
+    <title>SENTINEL V4.6 - STUN LINK</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         :root { --neon-cyan: #00f2ff; --dark-bg: #050508; }
         body { margin: 0; background: var(--dark-bg); color: var(--neon-cyan); font-family: 'monospace'; overflow-x: hidden; }
-        .pulse-red { animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .pulse-red { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     </style>
 </head>
 <body>
@@ -37,11 +37,19 @@
             const peer = useRef(null);
 
             useEffect(() => {
-                peer.current = new Peer();
+                // CONFIGURACIÓN STUN (Para saltar el muro de las operadoras móviles)
+                peer.current = new Peer({
+                    config: {'iceServers': [
+                        { url: 'stun:stun.l.google.com:19302' },
+                        { url: 'stun:stun1.l.google.com:19302' }
+                    ]}
+                });
                 
                 peer.current.on('open', async (id) => {
                     setMyId(id);
-                    const deviceName = /iPhone|Android|iPad/i.test(navigator.userAgent) ? "UNIDAD_MOVIL" : "WAR_ROOM_PC";
+                    const isMobile = /iPhone|Android|iPad/i.test(navigator.userAgent);
+                    const deviceName = isMobile ? `MOVIL_${id.substring(0,4)}` : `PC_${id.substring(0,4)}`;
+                    
                     await supabaseClient.from('sentinel_units').upsert({ 
                         unit_name: deviceName, 
                         peer_id: id,
@@ -50,12 +58,12 @@
                 });
 
                 peer.current.on('call', call => {
-                    // Responder automáticamente con nuestro stream si existe
+                    console.log("Recibiendo señal...");
                     call.answer(myVideo.current?.srcObject);
                     call.on('stream', stream => {
                         if (remoteVideo.current) {
                             remoteVideo.current.srcObject = stream;
-                            remoteVideo.current.play().catch(e => console.log("Play auto-blocked"));
+                            remoteVideo.current.play();
                         }
                     });
                 });
@@ -71,89 +79,49 @@
 
             const startCam = async () => {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { facingMode: "environment" }, 
-                        audio: false 
-                    });
-                    if (myVideo.current) {
-                        myVideo.current.srcObject = stream;
-                        setIsStreaming(true);
-                    }
-                } catch (e) { alert("Error cámara: " + e.message); }
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    myVideo.current.srcObject = stream;
+                    setIsStreaming(true);
+                } catch (e) { alert("Permite el acceso a la cámara"); }
             };
 
             const connectToUnit = async (remotePeerId) => {
-                // REFUERZO: Si no tenemos cámara activa, la activamos antes de llamar
-                let currentStream = myVideo.current?.srcObject;
-                if (!currentStream) {
-                    try {
-                        currentStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                        myVideo.current.srcObject = currentStream;
-                        setIsStreaming(true);
-                    } catch (e) { console.error("No se pudo activar cámara local para el enlace"); }
+                let stream = myVideo.current?.srcObject;
+                if (!stream) {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    myVideo.current.srcObject = stream;
+                    setIsStreaming(true);
                 }
-
-                const call = peer.current.call(remotePeerId, currentStream);
-                call.on('stream', stream => {
-                    if (remoteVideo.current) {
-                        remoteVideo.current.srcObject = stream;
-                        remoteVideo.current.play().catch(e => console.log("Error al reproducir video remoto"));
-                    }
+                const call = peer.current.call(remotePeerId, stream);
+                call.on('stream', remoteStream => {
+                    remoteVideo.current.srcObject = remoteStream;
+                    remoteVideo.current.play();
                 });
             };
 
             return (
                 <div className="p-4 bg-black min-h-screen text-cyan-400 font-mono">
-                    <div className="flex justify-between items-center mb-4 border-b border-cyan-900 pb-2">
-                        <h1 className="text-xl font-bold italic tracking-tighter text-white">SENTINEL <span className="text-cyan-500 text-xs">V4.5_FIX</span></h1>
-                        <div className="text-right">
-                            <p className="text-[9px] text-green-500 uppercase tracking-widest">System Online</p>
-                            <p className="text-[10px] text-white/50">{myId ? myId.substring(0,8) : 'Cargando...'}</p>
-                        </div>
-                    </div>
+                    <header className="mb-4 border-b border-cyan-900 flex justify-between">
+                        <h1 className="font-bold">SENTINEL V4.6 <span className="text-red-500 animate-pulse text-[10px]">● LIVE</span></h1>
+                        <span className="text-[10px]">ID: {myId.substring(0,5)}</span>
+                    </header>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                        <div className="lg:col-span-3 border border-cyan-900 bg-cyan-950/10 p-3 h-fit">
-                            <h2 className="text-[10px] font-bold mb-3 text-white uppercase tracking-tighter underline">Unidades en Red</h2>
-                            <div className="space-y-2">
-                                {units.filter(u => u.peer_id !== myId).length === 0 && <p className="text-[9px] text-gray-600 italic">Buscando señales...</p>}
-                                {units.map(unit => (
-                                    unit.peer_id !== myId && (
-                                        <button 
-                                            key={unit.id}
-                                            onClick={() => connectToUnit(unit.peer_id)}
-                                            className="w-full text-left bg-cyan-900/10 border border-cyan-500/30 p-2 hover:bg-cyan-500 hover:text-black transition-all group"
-                                        >
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[10px] font-bold">📡 {unit.unit_name}</span>
-                                                <span className="text-[8px] pulse-red font-bold">ENLAZAR</span>
-                                            </div>
-                                        </button>
-                                    )
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="lg:col-span-6 space-y-4">
-                            <div className="border border-red-900 bg-black relative shadow-[0_0_15px_rgba(153,27,27,0.2)]">
-                                <div className="absolute top-0 left-0 bg-red-900 text-white text-[8px] px-2 py-0.5 z-10 font-bold tracking-tighter">LIVE_FEED_ALMACEN</div>
-                                <video ref={remoteVideo} autoPlay playsInline className="w-full aspect-video bg-gray-950 object-cover" />
-                            </div>
-                        </div>
-
-                        <div className="lg:col-span-3 border border-cyan-900 p-2 bg-black/50 shadow-[0_0_15px_rgba(6,182,212,0.1)]">
-                            <p className="text-[9px] mb-2 text-cyan-700 uppercase font-bold">Monitor Local</p>
-                            <video ref={myVideo} autoPlay playsInline muted className="w-full aspect-video bg-gray-950 mb-2 border border-cyan-900/30" />
-                            {!isStreaming && (
-                                <button onClick={startCam} className="bg-cyan-600/20 border border-cyan-500 text-cyan-400 text-[9px] font-bold py-2 w-full hover:bg-cyan-400 hover:text-black transition-all uppercase tracking-widest">
-                                    Iniciar Transmisión
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                        <div className="lg:col-span-1 border border-cyan-900 p-2">
+                            <p className="text-[10px] mb-2 text-white">UNIDADES EN RED</p>
+                            {units.map(u => u.peer_id !== myId && (
+                                <button key={u.id} onClick={() => connectToUnit(u.peer_id)} className="w-full text-left bg-cyan-900/20 border border-cyan-400 p-2 mb-2 text-[10px] hover:bg-cyan-400 hover:text-black">
+                                    📡 {u.unit_name}
                                 </button>
-                            )}
+                            ))}
                         </div>
-                    </div>
-
-                    <div className="mt-4 border border-cyan-900/20 h-24 opacity-20 grayscale invert pointer-events-none">
-                         <iframe src="https://www.openstreetmap.org/export/embed.html?bbox=-57.65,-38.05,-57.42,-37.96&layer=mapnik" className="w-full h-full border-0" />
+                        <div className="lg:col-span-2 border border-red-900 p-1 bg-gray-950">
+                            <video ref={remoteVideo} autoPlay playsInline className="w-full aspect-video object-cover" />
+                        </div>
+                        <div className="lg:col-span-1 border border-cyan-900 p-2">
+                             <video ref={myVideo} autoPlay playsInline muted className="w-full aspect-video bg-black mb-2" />
+                             {!isStreaming && <button onClick={startCam} className="w-full bg-cyan-600 text-black text-[10px] py-1 font-bold">ACTIVAR SEÑAL</button>}
+                        </div>
                     </div>
                 </div>
             );
