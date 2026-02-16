@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css?v=1.1" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js?v=1.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2?v=1.1"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     
     <style>
         :root {
@@ -2487,7 +2488,7 @@
         <div class="sidebar-cameras">
             <div class="sidebar-title">[SNTNL_CAM_01]</div>
             <div class="camera-scan-wrap" id="cam-01-wrap">
-                <video src="https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/person-bicycle-car-detection.mp4" loop muted autoplay playsinline title="CAM 01 Feed"></video>
+                <video id="cam-01-video" autoplay playsinline title="CAM 01 Feed — Video real vía PeerJS"></video>
                 <span class="cam-01-label">CAM 01</span>
                 <span class="rec-indicator">REC</span>
                 <span class="scan-label">Scanning...</span>
@@ -2503,7 +2504,7 @@
             </div>
             <!-- CAM 02: video directo cámara tráfico MDQ o fallback imagen estática -->
             <div class="camera-scan-wrap cam-02-wrap" id="cam-02-wrap">
-                <video id="cam-02-video" src="https://www.monitordigital.com.ar/video/camara1.mp4" loop muted autoplay playsinline title="CAM 02 MDQ"></video>
+                <video id="cam-02-video" autoplay playsinline title="CAM 02 MDQ"></video>
                 <span class="rec-indicator">REC</span>
                 <div class="scanlines-overlay" aria-hidden="true"></div>
                 <div class="cam-02-fallback" id="cam-02-fallback">
@@ -2951,7 +2952,7 @@
         }, 9000);
     })();
 
-    /* CAM 02: si el video falla (CORS/404), mostrar fallback imagen estática con ruido y scanlines */
+    /* CAM 02: si el video falla o no hay src, mostrar fallback imagen estática con ruido y scanlines */
     (function initCam02Fallback() {
         var wrap = document.getElementById('cam-02-wrap');
         var video = document.getElementById('cam-02-video');
@@ -2967,6 +2968,32 @@
             if (video.readyState < 2) useFallback();
         }, 5000);
     })();
+
+    /* PeerJS: Dashboard como receptor fijo WAR_ROOM_CENTRAL. Stream entrante al video dentro de .cam-01-wrap (#cam-01-video). */
+    function initPeerJSReceiver() {
+        if (typeof Peer === 'undefined') return;
+        try {
+            var peer = new Peer('WAR_ROOM_CENTRAL');
+            peer.on('open', function () {
+                if (typeof appendMissionLog === 'function') appendMissionLog('[ PEERJS ] WAR_ROOM_CENTRAL listo — esperando video de unidad móvil', false);
+            });
+            peer.on('call', function (call) {
+                call.answer();
+                call.on('stream', function (remoteStream) {
+                    var videoEl = document.getElementById('cam-01-video');
+                    if (videoEl) {
+                        videoEl.srcObject = remoteStream;
+                        videoEl.play().catch(function () {});
+                    }
+                });
+            });
+            peer.on('error', function (err) {
+                if (err.type !== 'peer-unavailable' && typeof appendMissionLog === 'function') appendMissionLog('[ PEERJS ] ' + (err.message || err.type), true);
+            });
+        } catch (e) {
+            if (typeof appendMissionLog === 'function') appendMissionLog('[ PEERJS ] Error al iniciar receptor', true);
+        }
+    }
 
     function buildLatLngLabelHtml(lat, lng) {
         const latStr = lat != null && !isNaN(lat) ? lat.toFixed(5) : '—';
@@ -3633,8 +3660,7 @@
             .subscribe();
     }
 
-    // Suscripción Realtime a unidades_live: escucha TODOS los cambios (INSERT/UPDATE/DELETE) sin filtrar por fila.
-    // Cualquier ID nuevo (UNIDAD_01, UNIDAD_02, etc.) que no tenga marcador se crea con ensureUnidadLiveMarker vía syncUnidadLiveToMap.
+    // Suscripción Realtime a unidades_live: cada INSERT/UPDATE actualiza el marcador en el mapa vía syncUnidadLiveToMap (marker.setLatLng / smoothMoveMarker).
     function iniciarRealtimeUnidadesLive() {
         function fetchAndSyncUnidades() {
             supabaseClient
@@ -4181,8 +4207,13 @@
     iniciarRealtimeIncidentsPanic();
     ensureIncidentListPlaceholder();
 
+    if (!isMobile()) initPeerJSReceiver();
+
     /* ——— Lógica añadida: unidad móvil (baliza + pánico). Solo JS y detección isMobile(); no modifica HUD, mapa ni radar. ——— */
     var mobileBalizaWatchId = null;
+    var mobilePeer = null;
+    var mobileStream = null;
+    var mobileCall = null;
     var BEACON_ID_MOBILE = 'UNIDAD_MOBILE';
 
     function mobileSendPosition(pos) {
@@ -4234,23 +4265,62 @@
             if (mobileBalizaWatchId != null) {
                 navigator.geolocation.clearWatch(mobileBalizaWatchId);
                 mobileBalizaWatchId = null;
+                if (mobileStream) {
+                    mobileStream.getTracks().forEach(function (t) { t.stop(); });
+                    mobileStream = null;
+                }
+                if (mobileCall) { try { mobileCall.close(); } catch (e) {} mobileCall = null; }
+                if (mobilePeer) { try { mobilePeer.destroy(); } catch (e) {} mobilePeer = null; }
                 if (fabBaliza) { fabBaliza.textContent = 'BALIZA'; fabBaliza.classList.remove('running'); }
                 if (topBaliza) topBaliza.textContent = 'BALIZA SENTINEL';
+                return;
+            }
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                if (typeof appendMissionLog === 'function') appendMissionLog('Cámara no disponible', true);
                 return;
             }
             if (!navigator.geolocation) {
                 if (typeof appendMissionLog === 'function') appendMissionLog('GPS no disponible', true);
                 return;
             }
-            mobileBalizaWatchId = navigator.geolocation.watchPosition(
-                function (pos) { mobileSendPosition(pos); },
-                function (err) {
-                    if (typeof appendMissionLog === 'function') appendMissionLog('ERROR GPS: ' + (err.message || 'denegado'), true);
-                },
-                { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
-            );
-            if (fabBaliza) { fabBaliza.textContent = 'BALIZA ON'; fabBaliza.classList.add('running'); }
-            if (topBaliza) topBaliza.textContent = 'BALIZA ON';
+            fabBaliza && (fabBaliza.textContent = '...');
+            navigator.mediaDevices.getUserMedia({ video: true, audio: false }).then(function (stream) {
+                mobileStream = stream;
+                if (typeof Peer === 'undefined') {
+                    if (typeof appendMissionLog === 'function') appendMissionLog('PeerJS no cargado — solo GPS', true);
+                    startGpsOnly();
+                } else {
+                    try {
+                        var peerId = 'BALIZA_' + Math.random().toString(36).slice(2, 10);
+                        mobilePeer = new Peer(peerId);
+                        mobilePeer.on('open', function () {
+                            mobileCall = mobilePeer.call('WAR_ROOM_CENTRAL', stream);
+                            if (mobileCall) mobileCall.on('error', function () {});
+                            startGpsOnly();
+                        });
+                        mobilePeer.on('error', function (err) {
+                            if (typeof appendMissionLog === 'function') appendMissionLog('[ PEERJS ] ' + (err.message || err.type), true);
+                            startGpsOnly();
+                        });
+                    } catch (e) {
+                        startGpsOnly();
+                    }
+                }
+                if (fabBaliza) { fabBaliza.textContent = 'BALIZA ON'; fabBaliza.classList.add('running'); }
+                if (topBaliza) topBaliza.textContent = 'BALIZA ON';
+            }).catch(function (err) {
+                if (typeof appendMissionLog === 'function') appendMissionLog('Cámara denegada: ' + (err.message || 'permiso requerido'), true);
+                if (fabBaliza) fabBaliza.textContent = 'BALIZA';
+            });
+            function startGpsOnly() {
+                mobileBalizaWatchId = navigator.geolocation.watchPosition(
+                    function (pos) { mobileSendPosition(pos); },
+                    function (err) {
+                        if (typeof appendMissionLog === 'function') appendMissionLog('ERROR GPS: ' + (err.message || 'denegado'), true);
+                    },
+                    { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+                );
+            }
         }
 
         function doPanic() {
