@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENTINEL V4.4 - UNLOCK</title>
+    <title>SENTINEL V4.5 - AUTO LINK</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         :root { --neon-cyan: #00f2ff; --dark-bg: #050508; }
         body { margin: 0; background: var(--dark-bg); color: var(--neon-cyan); font-family: 'monospace'; overflow-x: hidden; }
+        .pulse-red { animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -21,9 +24,14 @@
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
 
+        // --- CONFIGURACIÓN SUPABASE (REEMPLAZA CON TUS DATOS) ---
+        const SUPABASE_URL = 'https://svpurpvbiujhcbiugrkh.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2cHVycHZiaXVqaGNiaXVncmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NDgzMTUsImV4cCI6MjA4MzMyNDMxNX0.AivKJ0_N0z_4T4vLNfUcE2hepJ1XXOO8-4fSA3PJXdc';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
         const WarRoom = () => {
             const [myId, setMyId] = useState('');
-            const [remoteId, setRemoteId] = useState('');
+            const [units, setUnits] = useState([]);
             const [isStreaming, setIsStreaming] = useState(false);
             const myVideo = useRef(null);
             const remoteVideo = useRef(null);
@@ -31,18 +39,38 @@
 
             useEffect(() => {
                 peer.current = new Peer();
-                peer.current.on('open', id => setMyId(id));
+                
+                peer.current.on('open', async (id) => {
+                    setMyId(id);
+                    // REGISTRO AUTOMÁTICO EN SUPABASE
+                    // Detectamos si es móvil o PC para ponerle nombre
+                    const deviceName = /iPhone|Android|iPad/i.test(navigator.userAgent) ? "UNIDAD_MOVIL" : "WAR_ROOM_PC";
+                    await supabase.from('sentinel_units').upsert({ 
+                        unit_name: deviceName, 
+                        peer_id: id,
+                        is_online: true 
+                    });
+                });
+
                 peer.current.on('call', call => {
-                    call.answer(myVideo.current?.srcObject);
+                    call.answer();
                     call.on('stream', stream => {
                         remoteVideo.current.srcObject = stream;
                     });
                 });
+
+                // ESCUCHAR UNIDADES ONLINE CADA 3 SEGUNDOS
+                const interval = setInterval(fetchUnits, 3000);
+                return () => clearInterval(interval);
             }, []);
+
+            const fetchUnits = async () => {
+                const { data } = await supabase.from('sentinel_units').select('*').eq('is_online', true);
+                setUnits(data || []);
+            };
 
             const startCam = async () => {
                 try {
-                    // Configuración simplificada para máxima compatibilidad
                     const stream = await navigator.mediaDevices.getUserMedia({ 
                         video: { facingMode: "environment" }, 
                         audio: false 
@@ -52,41 +80,72 @@
                 } catch (e) { alert("Error cámara: " + e.message); }
             };
 
-            const connect = () => {
-                // Quitamos la restricción de "Primero debes iniciar..."
-                const call = peer.current.call(remoteId, myVideo.current?.srcObject);
+            const connectToUnit = (remotePeerId) => {
+                // Para conectar, necesitamos enviar un stream (aunque sea vacío)
+                const call = peer.current.call(remotePeerId, myVideo.current?.srcObject);
                 call.on('stream', stream => {
                     remoteVideo.current.srcObject = stream;
                 });
             };
 
             return (
-                <div className="p-4 bg-black min-h-screen text-cyan-400">
-                    <h1 className="text-xl font-bold mb-4 border-b border-cyan-900">SENTINEL V4.4</h1>
-                    <p className="text-[10px] mb-4 text-green-500">MI ID: {myId}</p>
+                <div className="p-4 bg-black min-h-screen text-cyan-400 font-mono">
+                    <div className="flex justify-between items-center mb-4 border-b border-cyan-900 pb-2">
+                        <h1 className="text-xl font-bold italic tracking-tighter">SENTINEL <span className="text-white text-xs">V4.5_AUTO</span></h1>
+                        <div className="text-right">
+                            <p className="text-[9px] text-green-500 uppercase tracking-widest">System Online</p>
+                            <p className="text-[10px] text-white/50">{myId.substring(0,8)}...</p>
+                        </div>
+                    </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {/* PANEL CONTROL */}
-                        <div className="border border-yellow-600 p-2 bg-yellow-950/10">
-                            <input 
-                                className="bg-black border border-yellow-600 p-1 text-xs w-full mb-2"
-                                placeholder="PEGAR ID AQUÍ..."
-                                onChange={e => setRemoteId(e.target.value)}
-                            />
-                            <button onClick={connect} className="bg-yellow-600 text-black text-xs font-bold px-4 py-1 w-full">ENLAZAR SEÑAL</button>
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                        
+                        {/* PANEL DE UNIDADES DISPONIBLES */}
+                        <div className="lg:col-span-3 border border-cyan-900 bg-cyan-950/10 p-3 h-fit">
+                            <h2 className="text-[10px] font-bold mb-3 text-white uppercase tracking-tighter">Unidades en Red</h2>
+                            <div className="space-y-2">
+                                {units.filter(u => u.peer_id !== myId).length === 0 && <p className="text-[9px] text-gray-600">No hay unidades activas...</p>}
+                                {units.map(unit => (
+                                    unit.peer_id !== myId && (
+                                        <button 
+                                            key={unit.id}
+                                            onClick={() => connectToUnit(unit.peer_id)}
+                                            className="w-full text-left bg-cyan-900/20 border border-cyan-500/50 p-2 hover:bg-cyan-500 hover:text-black transition-all group"
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[10px] font-bold tracking-tighter">📡 {unit.unit_name}</span>
+                                                <span className="text-[8px] pulse-red">● LINK</span>
+                                            </div>
+                                        </button>
+                                    )
+                                ))}
+                            </div>
                         </div>
 
-                        {/* MI CÁMARA */}
-                        <div className="border border-cyan-900 p-2">
-                            <video ref={myVideo} autoPlay playsInline muted className="w-full aspect-video bg-gray-900 mb-2" />
-                            {!isStreaming && <button onClick={startCam} className="bg-cyan-600 text-black text-xs font-bold px-4 py-1 w-full">ACTIVAR MI CÁMARA</button>}
+                        {/* VISOR PRINCIPAL */}
+                        <div className="lg:col-span-6 space-y-4">
+                            <div className="border border-red-900 bg-black relative">
+                                <div className="absolute top-0 left-0 bg-red-900 text-white text-[8px] px-2 py-0.5 z-10 font-bold">LIVE_FEED_ALMACEN</div>
+                                <video ref={remoteVideo} autoPlay playsInline className="w-full aspect-video bg-gray-950 object-cover shadow-[0_0_20px_rgba(255,0,0,0.1)]" />
+                            </div>
                         </div>
 
-                        {/* CÁMARA REMOTA (ALMACÉN) */}
-                        <div className="border border-red-900 p-2 col-span-1 lg:col-span-2">
-                            <p className="text-[10px] text-red-500 mb-1">● SEÑAL REMOTA</p>
-                            <video ref={remoteVideo} autoPlay playsInline muted className="w-full max-h-[400px] bg-gray-950" />
+                        {/* MI CÁMARA LOCAL */}
+                        <div className="lg:col-span-3 border border-cyan-900 p-2 bg-black/50">
+                            <p className="text-[9px] mb-2 text-cyan-700 uppercase">Terminal Local</p>
+                            <video ref={myVideo} autoPlay playsInline muted className="w-full aspect-video bg-gray-900 mb-2 grayscale contrast-125" />
+                            {!isStreaming && (
+                                <button onClick={startCam} className="bg-cyan-600/20 border border-cyan-500 text-cyan-400 text-[9px] font-bold py-2 w-full hover:bg-cyan-500 hover:text-black transition-all">
+                                    ESTABLECER SEÑAL
+                                </button>
+                            )}
                         </div>
+
+                    </div>
+
+                    {/* MAPA MINIFICADO (Estética) */}
+                    <div className="mt-4 border border-cyan-900/30 h-32 opacity-30 grayscale invert pointer-events-none">
+                         <iframe src="https://www.openstreetmap.org/export/embed.html?bbox=-57.65,-38.05,-57.42,-37.96&layer=mapnik" className="w-full h-full border-0" />
                     </div>
                 </div>
             );
