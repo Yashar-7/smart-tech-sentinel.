@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENTINEL V4.3 - RED TÁCTICA</title>
+    <title>SENTINEL V4.4 - UNLOCK</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root { --neon-cyan: #00f2ff; --dark-bg: #050508; }
-        body { margin: 0; background: var(--dark-bg); color: var(--neon-cyan); font-family: 'JetBrains Mono', monospace; overflow-x: hidden; }
-        .glitch-border { border: 1px solid rgba(0, 242, 255, 0.3); box-shadow: 0 0 15px rgba(0, 242, 255, 0.1); }
+        body { margin: 0; background: var(--dark-bg); color: var(--neon-cyan); font-family: 'monospace'; overflow-x: hidden; }
     </style>
 </head>
 <body>
@@ -23,135 +22,77 @@
         const { useState, useRef, useEffect } = React;
 
         const WarRoom = () => {
-            const [myPeerId, setMyPeerId] = useState('');
-            const [remotePeerId, setRemotePeerId] = useState('');
+            const [myId, setMyId] = useState('');
+            const [remoteId, setRemoteId] = useState('');
             const [isStreaming, setIsStreaming] = useState(false);
-            const videoRef = useRef(null);
-            const remoteVideoRef = useRef(null);
-            const peerInstance = useRef(null);
+            const myVideo = useRef(null);
+            const remoteVideo = useRef(null);
+            const peer = useRef(null);
 
             useEffect(() => {
-                const peer = new Peer();
-                
-                peer.on('open', (id) => {
-                    setMyPeerId(id);
-                });
-
-                // Escuchar llamadas entrantes
-                peer.on('call', (call) => {
-                    call.answer(); // Contestamos automáticamente
-                    call.on('stream', (remoteStream) => {
-                        if (remoteVideoRef.current) {
-                            remoteVideoRef.current.srcObject = remoteStream;
-                            remoteVideoRef.current.play();
-                        }
+                peer.current = new Peer();
+                peer.current.on('open', id => setMyId(id));
+                peer.current.on('call', call => {
+                    call.answer(myVideo.current?.srcObject);
+                    call.on('stream', stream => {
+                        remoteVideo.current.srcObject = stream;
                     });
                 });
-
-                peerInstance.current = peer;
             }, []);
 
-            // Función para conectar con otra unidad (PC -> Celular)
-            const connectToPeer = () => {
-                if (!videoRef.current || !videoRef.current.srcObject) {
-                    alert("Primero debes INICIAR TRANSMISIÓN en este dispositivo para poder enlazar.");
-                    return;
-                }
-                const call = peerInstance.current.call(remotePeerId, videoRef.current.srcObject);
-                call.on('stream', (remoteStream) => {
-                    if (remoteVideoRef.current) {
-                        remoteVideoRef.current.srcObject = remoteStream;
-                        remoteVideoRef.current.play();
-                    }
-                });
-            };
-
-            const startTransmitting = async () => {
+            const startCam = async () => {
                 try {
+                    // Configuración simplificada para máxima compatibilidad
                     const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { facingMode: { ideal: "environment" } }, 
+                        video: { facingMode: "environment" }, 
                         audio: false 
                     });
-                    if (videoRef.current) {
-                        videoRef.current.srcObject = stream;
-                        videoRef.current.play();
-                        setIsStreaming(true);
-                    }
-                } catch (err) {
-                    alert("Error en cámara: " + err.message);
-                }
+                    myVideo.current.srcObject = stream;
+                    setIsStreaming(true);
+                } catch (e) { alert("Error cámara: " + e.message); }
+            };
+
+            const connect = () => {
+                // Quitamos la restricción de "Primero debes iniciar..."
+                const call = peer.current.call(remoteId, myVideo.current?.srcObject);
+                call.on('stream', stream => {
+                    remoteVideo.current.srcObject = stream;
+                });
             };
 
             return (
-                <div className="min-h-screen p-4 flex flex-col gap-4">
-                    <header className="border-b border-cyan-900 pb-2 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-2xl font-bold text-white tracking-tighter text-shadow-[0_0_10px_#00f2ff]">SENTINEL <span className="text-cyan-500 text-sm">V4.3</span></h1>
-                            <p className="text-[10px] text-green-500 uppercase tracking-widest">ID Operativo: <span className="text-white select-all">{myPeerId || 'Iniciando...'}</span></p>
-                        </div>
-                    </header>
+                <div className="p-4 bg-black min-h-screen text-cyan-400">
+                    <h1 className="text-xl font-bold mb-4 border-b border-cyan-900">SENTINEL V4.4</h1>
+                    <p className="text-[10px] mb-4 text-green-500">MI ID: {myId}</p>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
-                        <div className="lg:col-span-8 bg-slate-950 border border-cyan-900 relative">
-                             <iframe
-                                src="https://www.openstreetmap.org/export/embed.html?bbox=-57.65,-38.05,-57.42,-37.96&layer=mapnik"
-                                className="w-full h-full border-0 opacity-30 grayscale invert"
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* PANEL CONTROL */}
+                        <div className="border border-yellow-600 p-2 bg-yellow-950/10">
+                            <input 
+                                className="bg-black border border-yellow-600 p-1 text-xs w-full mb-2"
+                                placeholder="PEGAR ID AQUÍ..."
+                                onChange={e => setRemoteId(e.target.value)}
                             />
-                            <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]"></div>
+                            <button onClick={connect} className="bg-yellow-600 text-black text-xs font-bold px-4 py-1 w-full">ENLAZAR SEÑAL</button>
                         </div>
 
-                        <div className="lg:col-span-4 flex flex-col gap-4">
-                            {/* PANEL DE ENLACE */}
-                            <div className="border border-yellow-600 bg-yellow-950/20 p-3">
-                                <p className="text-[9px] text-yellow-500 mb-2 font-bold tracking-widest">ENLACE DE UNIDAD REMOTA</p>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="text" 
-                                        placeholder="ID DE LA OTRA UNIDAD..." 
-                                        className="bg-black border border-yellow-900 text-[10px] p-2 flex-1 text-white focus:border-yellow-500 outline-none"
-                                        onChange={(e) => setRemotePeerId(e.target.value)}
-                                    />
-                                    <button 
-                                        onClick={connectToPeer}
-                                        className="bg-yellow-600/30 border border-yellow-500 px-3 py-1 text-[10px] hover:bg-yellow-500 hover:text-black font-bold transition-all"
-                                    >
-                                        ENLAZAR
-                                    </button>
-                                </div>
-                            </div>
+                        {/* MI CÁMARA */}
+                        <div className="border border-cyan-900 p-2">
+                            <video ref={myVideo} autoPlay playsInline muted className="w-full aspect-video bg-gray-900 mb-2" />
+                            {!isStreaming && <button onClick={startCam} className="bg-cyan-600 text-black text-xs font-bold px-4 py-1 w-full">ACTIVAR MI CÁMARA</button>}
+                        </div>
 
-                            {/* FEED REMOTO */}
-                            <div className="border border-red-900 bg-black p-1">
-                                <div className="bg-red-950/20 text-[10px] p-1 flex justify-between text-red-500 font-bold">
-                                    <span>● LIVE_FEED_ALMACEN</span>
-                                    <span className="animate-pulse">SISTEMA ACTIVO</span>
-                                </div>
-                                <div className="aspect-video bg-black flex items-center justify-center">
-                                    <video ref={remoteVideoRef} playsInline autoPlay muted className="w-full h-full object-cover border border-red-500/20" />
-                                </div>
-                            </div>
-
-                            {/* MI CÁMARA LOCAL */}
-                            <div className="border border-cyan-900 bg-black p-2">
-                                <p className="text-[10px] text-cyan-600 mb-2 uppercase font-bold">Terminal Local</p>
-                                <div className="aspect-video bg-slate-900 flex items-center justify-center relative overflow-hidden border border-cyan-500/10">
-                                    {isStreaming ? (
-                                        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-                                    ) : (
-                                        <button onClick={startTransmitting} className="bg-cyan-950/40 border border-cyan-500 text-cyan-400 px-4 py-2 text-[10px] hover:bg-cyan-500 hover:text-black transition-all">
-                                            ACTIVAR CÁMARA
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
+                        {/* CÁMARA REMOTA (ALMACÉN) */}
+                        <div className="border border-red-900 p-2 col-span-1 lg:col-span-2">
+                            <p className="text-[10px] text-red-500 mb-1">● SEÑAL REMOTA</p>
+                            <video ref={remoteVideo} autoPlay playsInline muted className="w-full max-h-[400px] bg-gray-950" />
                         </div>
                     </div>
                 </div>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<WarRoom />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<WarRoom />);
     </script>
 </body>
 </html>
