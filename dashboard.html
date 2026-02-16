@@ -802,6 +802,39 @@
             0%, 100% { box-shadow: 0 0 20px rgba(57, 255, 20, 0.5); }
             50% { box-shadow: 0 0 35px rgba(57, 255, 20, 0.9); }
         }
+        /* BALIZA LIVE: overlay en CAM 02 con mini mapa cuando hay pánico */
+        .cam-02-baliza-live {
+            position: absolute; inset: 0; z-index: 10;
+            display: none; flex-direction: column;
+            background: rgba(10, 10, 20, 0.95);
+            border: 2px solid var(--alert-red);
+            box-shadow: inset 0 0 40px rgba(255, 0, 64, 0.15), 0 0 30px rgba(255, 0, 64, 0.3);
+        }
+        .cam-02-wrap.cam-02-baliza-active .cam-02-baliza-live {
+            display: flex;
+        }
+        .cam-02-baliza-live #cam-02-baliza-map {
+            flex: 1; min-height: 80px; width: 100%; background: #0a0a12;
+        }
+        .cam-02-baliza-live .cam-02-baliza-label {
+            position: absolute; top: 6px; left: 8px;
+            font-size: 0.65rem; font-weight: 700; letter-spacing: 2px;
+            color: var(--alert-red); text-shadow: 0 0 8px rgba(255, 0, 64, 0.8);
+            z-index: 2;
+        }
+        .cam-02-baliza-live .cam-02-baliza-coords {
+            position: absolute; bottom: 6px; left: 8px;
+            font-size: 0.6rem; font-family: monospace; color: var(--neon-cyan);
+            z-index: 2;
+        }
+        .cam-02-baliza-live .cam-02-baliza-close {
+            position: absolute; top: 4px; right: 8px;
+            z-index: 3; width: 24px; height: 24px; padding: 0;
+            background: rgba(255,0,64,0.3); border: 1px solid var(--alert-red);
+            color: #fff; font-size: 1.2rem; line-height: 1; cursor: pointer;
+            border-radius: 4px;
+        }
+        .cam-02-baliza-live .cam-02-baliza-close:hover { background: rgba(255,0,64,0.6); }
         /* System Health — glass + cabecera táctica */
         .system-health-panel {
             border-bottom: 1px solid rgba(0, 255, 255, 0.2);
@@ -2470,6 +2503,13 @@
                 <div class="cam-sentinel-overlay"></div>
                 <div class="scan-line"></div>
                 <div class="cam-target-acquired" id="cam-02-target">[TARGET ACQUIRED]</div>
+                <!-- Vista LIVE cuando hay pánico: mini mapa con ubicación en tiempo real -->
+                <div id="cam-02-baliza-live" class="cam-02-baliza-live" aria-hidden="true">
+                    <button type="button" class="cam-02-baliza-close" id="cam-02-baliza-close" aria-label="Cerrar vista baliza">×</button>
+                    <div id="cam-02-baliza-map"></div>
+                    <span class="cam-02-baliza-label">BALIZA LIVE — UBICACIÓN EN TIEMPO REAL</span>
+                    <span class="cam-02-baliza-coords" id="cam-02-baliza-coords">—</span>
+                </div>
             </div>
         </div>
         <div class="system-health-panel system-health-compact">
@@ -3285,11 +3325,17 @@
             m.setPopupContent(popupHtml);
             if (m.setStyle) m.setStyle(getCircleMarkerOptionsForUnidadLive(row.status));
             updateFirstLiveUnitUI();
+            if (id === 'UNIDAD_MOBILE' && (row.status || '').toLowerCase() === 'panic')
+                onPanicReceived(lat, lng);
+            else if (id === 'UNIDAD_MOBILE' && typeof balizaLiveActive !== 'undefined' && balizaLiveActive)
+                showBalizaLive(lat, lng);
             return;
         }
         ensureUnidadLiveMarker(id, row);
         appendMissionLog('BEACON DETECTED: ' + (row.name || 'Unidad'), false);
         updateFirstLiveUnitUI();
+        if (id === 'UNIDAD_MOBILE' && (row.status || '').toLowerCase() === 'panic' && row.lat != null && row.lng != null)
+            onPanicReceived(row.lat, row.lng);
     }
     function removeUnidadLiveFromMap(id) {
         var m = unidadesLiveMarkersById[id];
@@ -3589,13 +3635,25 @@
         channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'unidades_live' }, function (payload) {
             if (payload && payload.new) {
                 var row = normalizeUnidadLiveRow(payload.new) || payload.new;
-                if (row && row.id) syncUnidadLiveToMap(row);
+                if (row && row.id) {
+                    syncUnidadLiveToMap(row);
+                    if (row.id === 'UNIDAD_MOBILE' && (row.status || '').toLowerCase() === 'panic' && row.lat != null && row.lng != null)
+                        onPanicReceived(row.lat, row.lng);
+                    else if (row.id === 'UNIDAD_MOBILE' && balizaLiveActive && row.lat != null && row.lng != null)
+                        showBalizaLive(row.lat, row.lng);
+                }
             }
         });
         channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'unidades_live' }, function (payload) {
             if (payload && payload.new) {
                 var row = normalizeUnidadLiveRow(payload.new) || payload.new;
-                if (row && row.id) syncUnidadLiveToMap(row);
+                if (row && row.id) {
+                    syncUnidadLiveToMap(row);
+                    if (row.id === 'UNIDAD_MOBILE' && (row.status || '').toLowerCase() === 'panic' && row.lat != null && row.lng != null)
+                        onPanicReceived(row.lat, row.lng);
+                    else if (row.id === 'UNIDAD_MOBILE' && balizaLiveActive && row.lat != null && row.lng != null)
+                        showBalizaLive(row.lat, row.lng);
+                }
             }
         });
         channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'unidades_live' }, function (payload) {
@@ -3603,6 +3661,69 @@
         });
         channel.subscribe(function (status) {
             if (status === 'CHANNEL_ERROR') console.warn('Realtime unidades_live: CHANNEL_ERROR - usando polling de respaldo.');
+        });
+    }
+
+    // ——— PÁNICO / BALIZA LIVE: fly al GPS de la persona y transmisión en CAM 02 ———
+    var balizaMap = null;
+    var balizaMarker = null;
+    var balizaLiveActive = false;
+
+    function showBalizaLive(lat, lng) {
+        if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) return;
+        var wrap = document.getElementById('cam-02-wrap');
+        var container = document.getElementById('cam-02-baliza-map');
+        var coordsEl = document.getElementById('cam-02-baliza-coords');
+        if (!wrap || !container) return;
+        wrap.classList.add('cam-02-baliza-active');
+        if (coordsEl) coordsEl.textContent = 'LAT ' + Number(lat).toFixed(5) + ' · LNG ' + Number(lng).toFixed(5);
+        balizaLiveActive = true;
+
+        if (!balizaMap) {
+            balizaMap = L.map('cam-02-baliza-map', { zoomControl: false }).setView([lat, lng], 17);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(balizaMap);
+            balizaMarker = L.circleMarker([lat, lng], {
+                radius: 10,
+                fillColor: '#ff0040',
+                color: '#ff0040',
+                weight: 2,
+                fillOpacity: 0.9
+            }).addTo(balizaMap);
+            setTimeout(function () { if (balizaMap && balizaMap.invalidateSize) balizaMap.invalidateSize(); }, 100);
+        } else {
+            balizaMap.setView([lat, lng], balizaMap.getZoom(), { animate: true, duration: 0.5 });
+            balizaMarker.setLatLng([lat, lng]);
+        }
+    }
+
+    document.getElementById('cam-02-baliza-close').addEventListener('click', function () {
+        hideBalizaLive();
+    });
+
+    function hideBalizaLive() {
+        balizaLiveActive = false;
+        var wrap = document.getElementById('cam-02-wrap');
+        if (wrap) wrap.classList.remove('cam-02-baliza-active');
+    }
+
+    function onPanicReceived(lat, lng) {
+        if (typeof map !== 'undefined') map.flyTo([lat, lng], 17, { animate: true, duration: 1.5 });
+        showBalizaLive(lat, lng);
+        if (typeof appendMissionLog === 'function') appendMissionLog('ALERT: PÁNICO RECIBIDO — BALIZA EN VIVO', true);
+    }
+
+    function iniciarRealtimeIncidentsPanic() {
+        var ch = supabaseClient.channel('incidents_panic');
+        ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'incidents_log' }, function (payload) {
+            if (!payload || !payload.new) return;
+            var row = payload.new;
+            if ((row.incident_type || '').toString().toLowerCase() !== 'panic') return;
+            var lat = row.latitude != null ? Number(row.latitude) : null;
+            var lng = row.longitude != null ? Number(row.longitude) : null;
+            if (lat != null && lng != null && !isNaN(lat) && !isNaN(lng)) onPanicReceived(lat, lng);
+        });
+        ch.subscribe(function (status) {
+            if (status === 'CHANNEL_ERROR') console.warn('Realtime incidents_log: CHANNEL_ERROR');
         });
     }
 
@@ -4035,6 +4156,7 @@
 
     appendMissionLog('[ SYSTEM READY - SCANNING FOR BEACON SIGNALS... ]', false);
     iniciarRealtimeUnidadesLive();
+    iniciarRealtimeIncidentsPanic();
     ensureIncidentListPlaceholder();
     } // end initDashboard
     main();

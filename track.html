@@ -92,6 +92,31 @@
             color: #ffcc00;
             animation: blink 0.8s infinite;
         }
+        .panic-btn {
+            width: 100%;
+            max-width: 200px;
+            padding: 14px 24px;
+            font-family: 'VT323', 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            letter-spacing: 3px;
+            color: #ff0040;
+            background: rgba(255, 0, 64, 0.1);
+            border: 2px solid #ff0040;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 0 20px rgba(255, 0, 64, 0.2);
+        }
+        .panic-btn:hover {
+            background: rgba(255, 0, 64, 0.25);
+            box-shadow: 0 0 30px rgba(255, 0, 64, 0.4);
+        }
+        .panic-btn:active { transform: scale(0.98); }
+        .panic-btn.sent {
+            color: #00ff88;
+            border-color: #00ff88;
+            box-shadow: 0 0 25px rgba(0, 255, 136, 0.5);
+        }
         @keyframes blink {
             50% { opacity: 0.7; }
         }
@@ -123,6 +148,7 @@
                 <span id="beacon-btn-label">ACTIVAR BALIZA</span>
             </button>
         </div>
+        <button type="button" id="panic-btn" class="panic-btn" aria-label="Enviar señal de pánico">PÁNICO</button>
         <div id="beacon-state-text" class="beacon-state-text"></div>
         <div class="beacon-live">
             <div class="row"><span>LATITUD:</span><span id="beacon-lat" class="value">—</span></div>
@@ -186,6 +212,39 @@
                 }
             }
 
+            async function sendPanic(pos) {
+                const { latitude, longitude, accuracy } = pos.coords;
+                latEl.textContent = latitude.toFixed(6);
+                lngEl.textContent = longitude.toFixed(6);
+                if (precisionEl) precisionEl.textContent = Math.round(accuracy || 0) + 'm';
+
+                const panicBtn = document.getElementById('panic-btn');
+                panicBtn.classList.add('sent');
+                panicBtn.textContent = 'PÁNICO ENVIADO';
+                setTimeout(() => {
+                    panicBtn.classList.remove('sent');
+                    panicBtn.textContent = 'PÁNICO';
+                }, 3000);
+
+                await supabase.from('unidades_live').upsert({
+                    id: beaconId,
+                    name: 'Baliza En Vivo',
+                    lat: latitude,
+                    lng: longitude,
+                    status: 'panic'
+                });
+
+                await supabase.from('incidents_log').insert({
+                    latitude: latitude,
+                    longitude: longitude,
+                    incident_type: 'panic',
+                    event_time: new Date().toISOString()
+                });
+
+                setState("PÁNICO ENVIADO — WAR ROOM ALERTADO", "connected");
+                if (statusEl) statusEl.textContent = "Último pánico: " + new Date().toLocaleTimeString();
+            }
+
             btn.addEventListener('click', () => {
                 if (watchId) {
                     navigator.geolocation.clearWatch(watchId);
@@ -212,6 +271,17 @@
                         alert("Por favor, activa el GPS y permite el acceso.");
                     },
                     { enableHighAccuracy: true }
+                );
+            });
+
+            document.getElementById('panic-btn').addEventListener('click', () => {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => sendPanic(pos),
+                    (err) => {
+                        setState("ERROR GPS: " + err.message, "error");
+                        alert("Necesitamos tu ubicación para enviar el pánico. Activa el GPS y permite el acceso.");
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
                 );
             });
         })();
