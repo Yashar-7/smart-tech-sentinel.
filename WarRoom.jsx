@@ -49,7 +49,7 @@ const WarRoom = () => {
             <span className="text-xl">👁️</span>
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tighter">THE SENTINEL</h1>
+            <h1 className="text-2xl font-bold tracking-tighter">THE SENTINEL V2</h1>
             <p className="text-[10px] text-cyan-700">SMART TECH - WAR ROOM MDP</p>
           </div>
         </div>
