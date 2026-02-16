@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENTINEL V4.2 - LIVE FEED</title>
+    <title>SENTINEL V4.3 - RED TÁCTICA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
@@ -31,15 +31,13 @@
             const peerInstance = useRef(null);
 
             useEffect(() => {
-                // Generamos un ID único para esta sesión (ej: "Sentinel-User-123")
                 const peer = new Peer();
                 
                 peer.on('open', (id) => {
                     setMyPeerId(id);
-                    console.log('Mi ID de Sentinel es: ' + id);
                 });
 
-                // Escuchar llamadas entrantes (Cuando tu esposa se conecte a ti)
+                // Escuchar llamadas entrantes
                 peer.on('call', (call) => {
                     call.answer(); // Contestamos automáticamente
                     call.on('stream', (remoteStream) => {
@@ -53,6 +51,21 @@
                 peerInstance.current = peer;
             }, []);
 
+            // Función para conectar con otra unidad (PC -> Celular)
+            const connectToPeer = () => {
+                if (!videoRef.current || !videoRef.current.srcObject) {
+                    alert("Primero debes INICIAR TRANSMISIÓN en este dispositivo para poder enlazar.");
+                    return;
+                }
+                const call = peerInstance.current.call(remotePeerId, videoRef.current.srcObject);
+                call.on('stream', (remoteStream) => {
+                    if (remoteVideoRef.current) {
+                        remoteVideoRef.current.srcObject = remoteStream;
+                        remoteVideoRef.current.play();
+                    }
+                });
+            };
+
             const startTransmitting = async () => {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -64,7 +77,6 @@
                         videoRef.current.play();
                         setIsStreaming(true);
                     }
-                    // Aquí podrías llamar a un ID específico si lo tuvieras
                 } catch (err) {
                     alert("Error en cámara: " + err.message);
                 }
@@ -74,46 +86,60 @@
                 <div className="min-h-screen p-4 flex flex-col gap-4">
                     <header className="border-b border-cyan-900 pb-2 flex justify-between items-center">
                         <div>
-                            <h1 className="text-2xl font-bold text-white tracking-tighter">SENTINEL <span className="text-cyan-500 text-sm">V4.2</span></h1>
-                            <p className="text-[10px] text-green-500 uppercase tracking-widest">ID Operativo: {myPeerId || 'Iniciando...'}</p>
+                            <h1 className="text-2xl font-bold text-white tracking-tighter text-shadow-[0_0_10px_#00f2ff]">SENTINEL <span className="text-cyan-500 text-sm">V4.3</span></h1>
+                            <p className="text-[10px] text-green-500 uppercase tracking-widest">ID Operativo: <span className="text-white select-all">{myPeerId || 'Iniciando...'}</span></p>
                         </div>
                     </header>
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
-                        {/* MAPA IZQUIERDA */}
                         <div className="lg:col-span-8 bg-slate-950 border border-cyan-900 relative">
                              <iframe
                                 src="https://www.openstreetmap.org/export/embed.html?bbox=-57.65,-38.05,-57.42,-37.96&layer=mapnik"
                                 className="w-full h-full border-0 opacity-30 grayscale invert"
                             />
-                            <div className="absolute inset-0 pointer-events-none border-inner shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]"></div>
+                            <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]"></div>
                         </div>
 
-                        {/* FEEDS DERECHA */}
                         <div className="lg:col-span-4 flex flex-col gap-4">
-                            {/* FEED REMOTO (Lo que ve tu esposa) */}
+                            {/* PANEL DE ENLACE */}
+                            <div className="border border-yellow-600 bg-yellow-950/20 p-3">
+                                <p className="text-[9px] text-yellow-500 mb-2 font-bold tracking-widest">ENLACE DE UNIDAD REMOTA</p>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        placeholder="ID DE LA OTRA UNIDAD..." 
+                                        className="bg-black border border-yellow-900 text-[10px] p-2 flex-1 text-white focus:border-yellow-500 outline-none"
+                                        onChange={(e) => setRemotePeerId(e.target.value)}
+                                    />
+                                    <button 
+                                        onClick={connectToPeer}
+                                        className="bg-yellow-600/30 border border-yellow-500 px-3 py-1 text-[10px] hover:bg-yellow-500 hover:text-black font-bold transition-all"
+                                    >
+                                        ENLAZAR
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* FEED REMOTO */}
                             <div className="border border-red-900 bg-black p-1">
-                                <div className="bg-red-950/20 text-[10px] p-1 flex justify-between text-red-500">
-                                    <span>● LIVE_ALMACEN_FEED</span>
-                                    <span className="animate-pulse">REC</span>
+                                <div className="bg-red-950/20 text-[10px] p-1 flex justify-between text-red-500 font-bold">
+                                    <span>● LIVE_FEED_ALMACEN</span>
+                                    <span className="animate-pulse">SISTEMA ACTIVO</span>
                                 </div>
                                 <div className="aspect-video bg-black flex items-center justify-center">
-                                    <video ref={remoteVideoRef} playsInline autoPlay muted className="w-full h-full object-cover border border-red-500/30" />
+                                    <video ref={remoteVideoRef} playsInline autoPlay muted className="w-full h-full object-cover border border-red-500/20" />
                                 </div>
                             </div>
 
                             {/* MI CÁMARA LOCAL */}
                             <div className="border border-cyan-900 bg-black p-2">
-                                <p className="text-[10px] text-cyan-600 mb-2 uppercase tracking-tighter">Mi Terminal Movil</p>
-                                <div className="aspect-video bg-slate-900 flex items-center justify-center relative overflow-hidden">
+                                <p className="text-[10px] text-cyan-600 mb-2 uppercase font-bold">Terminal Local</p>
+                                <div className="aspect-video bg-slate-900 flex items-center justify-center relative overflow-hidden border border-cyan-500/10">
                                     {isStreaming ? (
                                         <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                                     ) : (
-                                        <button 
-                                            onClick={startTransmitting}
-                                            className="bg-cyan-950/40 border border-cyan-500 text-cyan-400 px-4 py-2 text-[10px] hover:bg-cyan-500 hover:text-black transition-all"
-                                        >
-                                            INICIAR TRANSMISIÓN
+                                        <button onClick={startTransmitting} className="bg-cyan-950/40 border border-cyan-500 text-cyan-400 px-4 py-2 text-[10px] hover:bg-cyan-500 hover:text-black transition-all">
+                                            ACTIVAR CÁMARA
                                         </button>
                                     )}
                                 </div>
