@@ -163,6 +163,17 @@
             transform: scale(1.05);
         }
         .fab-baliza:active { transform: scale(0.98); }
+        .fab-panic {
+            bottom: 96px;
+            right: 24px;
+            background: rgba(255, 0, 64, 0.2);
+            border-color: var(--alert-red);
+            color: var(--alert-red);
+        }
+        .fab-panic:hover { background: rgba(255, 0, 64, 0.35); }
+        .fab-panic.sent { color: #00ff88; border-color: #00ff88; background: rgba(0, 255, 136, 0.2); }
+        .btn-panic { color: var(--alert-red); border-color: var(--alert-red); }
+        .btn-panic:hover { background: rgba(255, 0, 64, 0.15); }
         @media (max-width: 768px) {
             .fab-baliza {
                 display: flex;
@@ -175,6 +186,10 @@
             }
             .top-bar-baliza { display: none !important; }
             .top-bar { display: none; }
+            .is-mobile .top-bar .top-bar-baliza,
+            .is-mobile .top-bar .btn-panic { display: inline-block !important; }
+            .is-mobile .fab-baliza,
+            .is-mobile .fab-panic { display: flex !important; }
             /* Contenedor principal: flex columna en móvil */
             .app-dashboard {
                 height: 100vh;
@@ -802,39 +817,40 @@
             0%, 100% { box-shadow: 0 0 20px rgba(57, 255, 20, 0.5); }
             50% { box-shadow: 0 0 35px rgba(57, 255, 20, 0.9); }
         }
-        /* BALIZA LIVE: overlay en CAM 02 con mini mapa cuando hay pánico */
-        .cam-02-baliza-live {
-            position: absolute; inset: 0; z-index: 10;
-            display: none; flex-direction: column;
-            background: rgba(10, 10, 20, 0.95);
+        /* BALIZA LIVE: dentro del contenedor .cam-02-fallback existente */
+        .cam-02-wrap .cam-02-fallback .cam-02-baliza-content {
+            display: none; position: absolute; inset: 0; z-index: 4;
+            flex-direction: column; background: rgba(10, 10, 20, 0.98);
             border: 2px solid var(--alert-red);
-            box-shadow: inset 0 0 40px rgba(255, 0, 64, 0.15), 0 0 30px rgba(255, 0, 64, 0.3);
+            box-shadow: inset 0 0 40px rgba(255, 0, 64, 0.15);
         }
-        .cam-02-wrap.cam-02-baliza-active .cam-02-baliza-live {
-            display: flex;
-        }
-        .cam-02-baliza-live #cam-02-baliza-map {
+        .cam-02-wrap.cam-02-baliza-active .cam-02-fallback { display: block; z-index: 10; }
+        .cam-02-wrap.cam-02-baliza-active video { display: none !important; }
+        .cam-02-wrap.cam-02-baliza-active .cam-02-fallback .cam-02-silhouette,
+        .cam-02-wrap.cam-02-baliza-active .cam-02-fallback .cam-02-heatmap { display: none !important; }
+        .cam-02-wrap.cam-02-baliza-active .cam-02-fallback .cam-02-baliza-content { display: flex; }
+        .cam-02-wrap .cam-02-fallback .cam-02-baliza-content #cam-02-baliza-map {
             flex: 1; min-height: 80px; width: 100%; background: #0a0a12;
         }
-        .cam-02-baliza-live .cam-02-baliza-label {
+        .cam-02-wrap .cam-02-fallback .cam-02-baliza-content .cam-02-baliza-label {
             position: absolute; top: 6px; left: 8px;
             font-size: 0.65rem; font-weight: 700; letter-spacing: 2px;
             color: var(--alert-red); text-shadow: 0 0 8px rgba(255, 0, 64, 0.8);
             z-index: 2;
         }
-        .cam-02-baliza-live .cam-02-baliza-coords {
+        .cam-02-wrap .cam-02-fallback .cam-02-baliza-content .cam-02-baliza-coords {
             position: absolute; bottom: 6px; left: 8px;
             font-size: 0.6rem; font-family: monospace; color: var(--neon-cyan);
             z-index: 2;
         }
-        .cam-02-baliza-live .cam-02-baliza-close {
+        .cam-02-wrap .cam-02-fallback .cam-02-baliza-content .cam-02-baliza-close {
             position: absolute; top: 4px; right: 8px;
             z-index: 3; width: 24px; height: 24px; padding: 0;
             background: rgba(255,0,64,0.3); border: 1px solid var(--alert-red);
             color: #fff; font-size: 1.2rem; line-height: 1; cursor: pointer;
             border-radius: 4px;
         }
-        .cam-02-baliza-live .cam-02-baliza-close:hover { background: rgba(255,0,64,0.6); }
+        .cam-02-wrap .cam-02-fallback .cam-02-baliza-content .cam-02-baliza-close:hover { background: rgba(255,0,64,0.6); }
         /* System Health — glass + cabecera táctica */
         .system-health-panel {
             border-bottom: 1px solid rgba(0, 255, 255, 0.2);
@@ -2351,11 +2367,13 @@
     <button type="button" id="btn-logout" class="btn-command" style="margin-left:8px;" title="Cerrar sesión">CERRAR SESIÓN</button>
 </header>
 
-<!-- Top Bar: enlace a Baliza (unidades reales desde unidades_live); en móvil se usa el FAB -->
+<!-- Top Bar: en desktop solo etiqueta; en móvil la lógica baliza/pánico está en este mismo dashboard -->
 <div class="top-bar">
-    <a href="track.html" class="btn-command top-bar-baliza" style="text-decoration:none;color:inherit;">BALIZA SENTINEL (TRACK)</a>
+    <button type="button" class="btn-command top-bar-baliza" id="top-bar-baliza" style="display:none;">BALIZA SENTINEL</button>
+    <button type="button" class="btn-command btn-panic" id="top-bar-panic" style="display:none;">PÁNICO</button>
 </div>
-<a href="track.html" class="fab-baliza" id="fab-baliza" aria-label="Abrir Baliza Sentinel">BALIZA</a>
+<button type="button" class="fab-baliza" id="fab-baliza" aria-label="Activar o desactivar Baliza" style="display:none;">BALIZA</button>
+<button type="button" class="fab-baliza fab-panic" id="fab-panic" aria-label="Enviar señal de pánico" style="display:none;">PÁNICO</button>
 
 <div id="geofence-banner" class="geofence-banner" aria-hidden="true">¡ADVERTENCIA: ZONA RESTRINGIDA!</div>
 
@@ -2497,19 +2515,19 @@
                         <div class="heat-spot n2" style="left:60%;top:60%;width:18%;height:18%;"></div>
                         <div class="heat-spot n3" style="left:80%;top:70%;width:15%;height:15%;"></div>
                     </div>
+                    <!-- Baliza LIVE: mismo contenedor fallback, modo pánico -->
+                    <div class="cam-02-baliza-content" id="cam-02-baliza-content" aria-hidden="true">
+                        <button type="button" class="cam-02-baliza-close" id="cam-02-baliza-close" aria-label="Cerrar vista baliza">×</button>
+                        <div id="cam-02-baliza-map"></div>
+                        <span class="cam-02-baliza-label">BALIZA LIVE — UBICACIÓN EN TIEMPO REAL</span>
+                        <span class="cam-02-baliza-coords" id="cam-02-baliza-coords">—</span>
+                    </div>
                 </div>
                 <span class="cam-01-label">CAM 02 · THE SENTINEL</span>
                 <span class="scan-label">Scanning...</span>
                 <div class="cam-sentinel-overlay"></div>
                 <div class="scan-line"></div>
                 <div class="cam-target-acquired" id="cam-02-target">[TARGET ACQUIRED]</div>
-                <!-- Vista LIVE cuando hay pánico: mini mapa con ubicación en tiempo real -->
-                <div id="cam-02-baliza-live" class="cam-02-baliza-live" aria-hidden="true">
-                    <button type="button" class="cam-02-baliza-close" id="cam-02-baliza-close" aria-label="Cerrar vista baliza">×</button>
-                    <div id="cam-02-baliza-map"></div>
-                    <span class="cam-02-baliza-label">BALIZA LIVE — UBICACIÓN EN TIEMPO REAL</span>
-                    <span class="cam-02-baliza-coords" id="cam-02-baliza-coords">—</span>
-                </div>
             </div>
         </div>
         <div class="system-health-panel system-health-compact">
@@ -2714,6 +2732,9 @@
         }
         showDashboard();
         initDashboard();
+    }
+    function isMobile() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
     }
     function initDashboard() {
 
@@ -4158,6 +4179,100 @@
     iniciarRealtimeUnidadesLive();
     iniciarRealtimeIncidentsPanic();
     ensureIncidentListPlaceholder();
+
+    // ——— Unidad móvil: baliza y pánico en este mismo dashboard cuando se detecta celular ———
+    var mobileBalizaWatchId = null;
+    var BEACON_ID_MOBILE = 'UNIDAD_MOBILE';
+
+    function mobileSendPosition(pos) {
+        var lat = pos.coords.latitude;
+        var lng = pos.coords.longitude;
+        var accuracy = pos.coords.accuracy;
+        supabaseClient.from('unidades_live').upsert({
+            id: BEACON_ID_MOBILE,
+            name: 'Baliza En Vivo',
+            lat: lat,
+            lng: lng,
+            status: 'active'
+        }).then(function (r) {
+            if (r.error) console.warn('unidades_live mobile:', r.error.message);
+        });
+    }
+
+    function mobileSendPanic(pos) {
+        var lat = pos.coords.latitude;
+        var lng = pos.coords.longitude;
+        supabaseClient.from('unidades_live').upsert({
+            id: BEACON_ID_MOBILE,
+            name: 'Baliza En Vivo',
+            lat: lat,
+            lng: lng,
+            status: 'panic'
+        }).then(function () {});
+        supabaseClient.from('incidents_log').insert({
+            latitude: lat,
+            longitude: lng,
+            incident_type: 'panic',
+            event_time: new Date().toISOString()
+        }).then(function () {});
+        if (typeof appendMissionLog === 'function') appendMissionLog('PÁNICO ENVIADO — WAR ROOM ALERTADO', true);
+        var fab = document.getElementById('fab-panic');
+        if (fab) { fab.textContent = 'ENVIADO'; fab.classList.add('sent'); setTimeout(function () { fab.textContent = 'PÁNICO'; fab.classList.remove('sent'); }, 3000); }
+    }
+
+    function setupMobileBaliza() {
+        if (!isMobile()) return;
+        document.body.classList.add('is-mobile');
+
+        var fabBaliza = document.getElementById('fab-baliza');
+        var fabPanic = document.getElementById('fab-panic');
+        var topBaliza = document.getElementById('top-bar-baliza');
+        var topPanic = document.getElementById('top-bar-panic');
+
+        function toggleBaliza() {
+            if (mobileBalizaWatchId != null) {
+                navigator.geolocation.clearWatch(mobileBalizaWatchId);
+                mobileBalizaWatchId = null;
+                if (fabBaliza) { fabBaliza.textContent = 'BALIZA'; fabBaliza.classList.remove('running'); }
+                if (topBaliza) topBaliza.textContent = 'BALIZA SENTINEL';
+                return;
+            }
+            if (!navigator.geolocation) {
+                if (typeof appendMissionLog === 'function') appendMissionLog('GPS no disponible', true);
+                return;
+            }
+            mobileBalizaWatchId = navigator.geolocation.watchPosition(
+                function (pos) { mobileSendPosition(pos); },
+                function (err) {
+                    if (typeof appendMissionLog === 'function') appendMissionLog('ERROR GPS: ' + (err.message || 'denegado'), true);
+                },
+                { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+            );
+            if (fabBaliza) { fabBaliza.textContent = 'BALIZA ON'; fabBaliza.classList.add('running'); }
+            if (topBaliza) topBaliza.textContent = 'BALIZA ON';
+        }
+
+        function doPanic() {
+            if (!navigator.geolocation) {
+                if (typeof appendMissionLog === 'function') appendMissionLog('GPS no disponible para pánico', true);
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                function (pos) { mobileSendPanic(pos); },
+                function (err) {
+                    if (typeof appendMissionLog === 'function') appendMissionLog('ERROR GPS: ' + (err.message || 'denegado'), true);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        if (fabBaliza) fabBaliza.addEventListener('click', toggleBaliza);
+        if (topBaliza) topBaliza.addEventListener('click', toggleBaliza);
+        if (fabPanic) fabPanic.addEventListener('click', doPanic);
+        if (topPanic) topPanic.addEventListener('click', doPanic);
+    }
+    if (isMobile()) setupMobileBaliza();
+
     } // end initDashboard
     main();
 </script>
