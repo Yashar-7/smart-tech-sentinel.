@@ -3,19 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SENTINEL V5.4 - SOLID CORE</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>SENTINEL V5.4.1 - RECOVERY</title>
+    
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script> <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
     <style>
         :root { --neon: #00f2ff; --panic: #ff003c; --bg: #020203; }
         body { background: var(--bg); color: var(--neon); font-family: 'Courier New', monospace; margin: 0; }
         .cyber-panel { border: 1px solid rgba(0, 242, 255, 0.2); background: rgba(0, 0, 0, 0.8); }
         .panic-alert { animation: panic-bg 0.4s infinite; }
-        @keyframes panic-bg { 0%, 100% { border-color: #ff003c; } 50% { border-color: white; } }
+        @keyframes panic-bg { 0%, 100% { border-color: #ff003c; box-shadow: 0 0 20px #ff003c; } 50% { border-color: white; box-shadow: none; } }
+        .grid-bg { background-image: linear-gradient(rgba(0, 242, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 242, 255, 0.05) 1px, transparent 1px); background-size: 30px 30px; }
     </style>
 </head>
-<body class="overflow-hidden">
+<body class="overflow-hidden grid-bg">
     <div id="root"></div>
 
     <script type="text/babel">
@@ -52,7 +57,6 @@
 
                 peerRef.current = peer;
 
-                // Escuchar Alertas
                 const sub = supabase.channel('sentinel_events')
                     .on('postgres_changes', { event: 'INSERT', table: 'sentinel_alerts' }, async (payload) => {
                         const { data } = await supabase.from('sentinel_units').select('unit_name, peer_id').eq('peer_id', payload.new.unit_id).single();
@@ -86,43 +90,42 @@
             return (
                 <div className="h-screen w-screen p-4 flex flex-col gap-4">
                     <div className="flex justify-between items-center border-b border-cyan-500/30 pb-2">
-                        <div className="text-xl font-bold tracking-tighter">SENTINEL_V5.4</div>
-                        <button onClick={startMedia} className="text-[10px] border border-cyan-500 px-4 py-1 hover:bg-cyan-500 hover:text-black">CONECTAR_HARDWARE</button>
+                        <div className="text-xl font-bold tracking-tighter italic">SENTINEL_V5.4.1</div>
+                        <button onClick={startMedia} className="text-[10px] border border-cyan-500 px-4 py-1 hover:bg-cyan-500 hover:text-black">CONECTAR_SISTEMA</button>
                     </div>
 
                     <div className="flex-grow grid grid-cols-12 gap-4 overflow-hidden">
-                        {/* UNIDADES (Solo PC) */}
                         {isPC && (
                             <div className="col-span-3 overflow-y-auto space-y-2">
+                                <p className="text-[10px] opacity-50 mb-2 underline">NODOS_ACTIVOS</p>
                                 {units.map(u => (
                                     <div key={u.id} className="cyber-panel p-2 flex justify-between items-center">
-                                        <span className="text-[10px]">{u.unit_name}</span>
-                                        <button onClick={() => peerRef.current.call(u.peer_id, myVideo.current.srcObject).on('stream', s => remoteVideo.current.srcObject = s)} className="text-[8px] bg-cyan-900 px-2 underline">LINK</button>
+                                        <span className="text-[10px] truncate">{u.unit_name}</span>
+                                        <button onClick={() => peerRef.current.call(u.peer_id, myVideo.current.srcObject).on('stream', s => remoteVideo.current.srcObject = s)} className="text-[8px] bg-cyan-900 px-2 border border-cyan-500">LINK</button>
                                     </div>
                                 ))}
                             </div>
                         )}
 
-                        {/* VISOR CENTRAL */}
                         <div className={`${isPC ? 'col-span-6' : 'col-span-12'} cyber-panel relative flex items-center justify-center bg-black overflow-hidden`}>
                             {activePanic && (
                                 <div className="absolute inset-0 z-50 bg-red-950/80 flex flex-col items-center justify-center border-4 border-red-600 panic-alert">
-                                    <h2 className="text-2xl font-black text-white italic text-center">!!! ALERTA !!!<br/>{activePanic}</h2>
+                                    <h2 className="text-3xl font-black text-white italic text-center">ALERTA CRITICA<br/>{activePanic}</h2>
+                                    <p className="text-red-400 text-[10px] mt-4 animate-pulse">ESTABLECIENDO CONEXIÓN VISUAL...</p>
                                 </div>
                             )}
                             <video ref={remoteVideo} autoPlay playsInline className="w-full h-full object-cover" />
                         </div>
 
-                        {/* MONITOR LOCAL Y NOMBRE */}
                         <div className={`${isPC ? 'col-span-3' : 'col-span-12'} flex flex-col gap-4`}>
                             <div className="cyber-panel p-1">
                                 <video ref={myVideo} autoPlay playsInline muted className="w-full aspect-video grayscale border border-cyan-900" />
                                 {!isPC && (
                                     <input 
-                                        className="w-full bg-transparent border-t border-cyan-900 text-[10px] p-2 text-center outline-none focus:text-white"
-                                        placeholder="NOMBRE DE UNIDAD..."
+                                        className="w-full bg-cyan-900/20 border-t border-cyan-900 text-[10px] p-2 text-center outline-none focus:bg-cyan-500 focus:text-black placeholder-cyan-700"
+                                        placeholder="IDENTIFICACIÓN UNIDAD..."
                                         onBlur={(e) => {
-                                            const n = e.target.value.toUpperCase();
+                                            const n = e.target.value.toUpperCase() || 'MOVIL_N';
                                             setUnitName(n);
                                             localStorage.setItem('sentinel_name', n);
                                             supabase.from('sentinel_units').update({ unit_name: n }).eq('peer_id', myId);
@@ -131,7 +134,7 @@
                                 )}
                             </div>
                             {!isPC && (
-                                <button onClick={sendPanic} className="flex-grow bg-red-600 text-white font-black text-2xl border-4 border-red-900 active:bg-white active:text-red-600">PÁNICO</button>
+                                <button onClick={sendPanic} className="flex-grow bg-red-600 text-white font-black text-4xl border-4 border-red-900 active:bg-white active:text-red-600">PÁNICO</button>
                             )}
                         </div>
                     </div>
