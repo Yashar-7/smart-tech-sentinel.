@@ -176,6 +176,23 @@
         .fab-panic.sent { color: #00ff88; border-color: #00ff88; background: rgba(0, 255, 136, 0.2); }
         .btn-panic { color: var(--alert-red); border-color: var(--alert-red); }
         .btn-panic:hover { background: rgba(255, 0, 64, 0.15); }
+        .mobile-name-bar {
+            position: fixed; bottom: 100px; left: 16px; right: 16px; z-index: 9998;
+            display: none; flex-direction: column; gap: 6px;
+        }
+        .mobile-name-label {
+            font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+            font-size: 0.65rem; font-weight: 600; letter-spacing: 1px;
+            color: var(--neon-cyan); text-shadow: 0 0 8px rgba(0, 242, 255, 0.5);
+        }
+        .mobile-name-input {
+            width: 100%; padding: 10px 12px; font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem; color: var(--neon-cyan); background: rgba(10, 10, 20, 0.95);
+            border: 2px solid rgba(0, 242, 255, 0.4); border-radius: 6px;
+            box-shadow: 0 0 12px rgba(0, 242, 255, 0.15);
+        }
+        .mobile-name-input::placeholder { color: rgba(0, 242, 255, 0.5); }
+        .mobile-name-input:focus { outline: none; border-color: var(--neon-cyan); box-shadow: 0 0 16px rgba(0, 242, 255, 0.3); }
         @media (max-width: 768px) {
             .fab-baliza {
                 display: flex;
@@ -190,8 +207,9 @@
             .top-bar { display: none; }
             .is-mobile .top-bar .top-bar-baliza,
             .is-mobile .top-bar .btn-panic { display: inline-block !important; }
-            .is-mobile .fab-baliza,
-            .is-mobile .fab-panic { display: flex !important; }
+        .is-mobile .fab-baliza,
+        .is-mobile .fab-panic { display: flex !important; }
+        .is-mobile .mobile-name-bar { display: block !important; }
             /* Contenedor principal: flex columna en móvil */
             .app-dashboard {
                 height: 100vh;
@@ -2415,6 +2433,11 @@
     <button type="button" class="btn-command top-bar-baliza" id="top-bar-baliza" style="display:none;">BALIZA SENTINEL</button>
     <button type="button" class="btn-command btn-panic" id="top-bar-panic" style="display:none;">PÁNICO</button>
 </div>
+<!-- Móvil: campo nombre/unidad arriba de los botones; se usa como peerID y en Supabase -->
+<div class="mobile-name-bar" id="mobile-name-bar" style="display:none;">
+    <label for="mobile-unit-name" class="mobile-name-label">Tu Nombre o Unidad</label>
+    <input type="text" id="mobile-unit-name" class="mobile-name-input" placeholder="Ej: Patrulla 01, María" maxlength="30" autocomplete="off" />
+</div>
 <button type="button" class="fab-baliza" id="fab-baliza" aria-label="Activar o desactivar Baliza" style="display:none;">BALIZA</button>
 <button type="button" class="fab-baliza fab-panic" id="fab-panic" aria-label="Enviar señal de pánico" style="display:none;">PÁNICO</button>
 
@@ -4267,13 +4290,26 @@
     var mobileCall = null;
     var BEACON_ID_MOBILE = 'UNIDAD_MOBILE';
 
+    function getMobileUnitName() {
+        var el = document.getElementById('mobile-unit-name');
+        var name = (el && el.value) ? el.value.trim() : '';
+        return name || 'Baliza En Vivo';
+    }
+
+    function getMobilePeerId() {
+        var el = document.getElementById('mobile-unit-name');
+        var raw = (el && el.value) ? el.value.trim() : '';
+        var sanitized = raw.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 20);
+        return sanitized || ('Unidad_' + Math.random().toString(36).slice(2, 8));
+    }
+
     function mobileSendPosition(pos) {
         var lat = pos.coords.latitude;
         var lng = pos.coords.longitude;
         var accuracy = pos.coords.accuracy;
         supabaseClient.from('unidades_live').upsert({
             id: BEACON_ID_MOBILE,
-            name: 'Baliza En Vivo',
+            name: getMobileUnitName(),
             lat: lat,
             lng: lng,
             status: 'active'
@@ -4287,7 +4323,7 @@
         var lng = pos.coords.longitude;
         supabaseClient.from('unidades_live').upsert({
             id: BEACON_ID_MOBILE,
-            name: 'Baliza En Vivo',
+            name: getMobileUnitName(),
             lat: lat,
             lng: lng,
             status: 'panic'
@@ -4342,7 +4378,7 @@
                     startGpsOnly();
                 } else {
                     try {
-                        var peerId = 'BALIZA_' + Math.random().toString(36).slice(2, 10);
+                        var peerId = getMobilePeerId();
                         mobilePeer = new Peer(peerId);
                         mobilePeer.on('open', function () {
                             mobileCall = mobilePeer.call('WAR_ROOM_CENTRAL', stream);
@@ -4380,7 +4416,7 @@
                 mobileStream = stream;
                 if (typeof Peer === 'undefined') return;
                 try {
-                    var peerId = 'BALIZA_' + Math.random().toString(36).slice(2, 10);
+                    var peerId = getMobilePeerId();
                     mobilePeer = new Peer(peerId);
                     mobilePeer.on('open', function () {
                         mobileCall = mobilePeer.call('WAR_ROOM_CENTRAL', stream);
