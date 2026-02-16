@@ -3,28 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENTINEL V4.1 - Smart Tech</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=VT323&display=swap" rel="stylesheet">
-    
+    <title>SENTINEL V4.2 - LIVE FEED</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        :root {
-            --neon-cyan: #00f2ff;
-            --dark-bg: #050508;
-        }
-        body {
-            margin: 0;
-            background: var(--dark-bg);
-            color: var(--neon-cyan);
-            font-family: 'JetBrains Mono', monospace;
-        }
+        :root { --neon-cyan: #00f2ff; --dark-bg: #050508; }
+        body { margin: 0; background: var(--dark-bg); color: var(--neon-cyan); font-family: 'JetBrains Mono', monospace; overflow-x: hidden; }
+        .glitch-border { border: 1px solid rgba(0, 242, 255, 0.3); box-shadow: 0 0 15px rgba(0, 242, 255, 0.1); }
     </style>
 </head>
 <body>
-
     <div id="root"></div>
 
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -34,76 +22,98 @@
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
 
-        // Tu componente SentinelVision
-        const SentinelVision = ({ label = 'Live Feed: Almacén_01' }) => {
-            const VIDEO_ID = '36pY9v6m-48';
-            return (
-                <div className="border-2 border-cyan-500 bg-black p-1 relative mb-4">
-                    <div className="aspect-video bg-slate-900 relative overflow-hidden">
-                        <iframe
-                            src={`https://www.youtube.com/embed/${VIDEO_ID}?autoplay=1&mute=1&controls=0`}
-                            title="Security feed"
-                            className="absolute inset-0 w-full h-full object-cover grayscale opacity-50"
-                        />
-                        <div className="absolute top-2 left-2 flex items-center gap-2">
-                            <div className="h-2 w-2 animate-pulse rounded-full bg-red-600" />
-                            <span className="text-[10px] text-cyan-400 font-mono">{label}</span>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        // Tu componente WarRoom principal
         const WarRoom = () => {
+            const [myPeerId, setMyPeerId] = useState('');
+            const [remotePeerId, setRemotePeerId] = useState('');
             const [isStreaming, setIsStreaming] = useState(false);
             const videoRef = useRef(null);
+            const remoteVideoRef = useRef(null);
+            const peerInstance = useRef(null);
 
-            const startCamera = async () => {
+            useEffect(() => {
+                // Generamos un ID único para esta sesión (ej: "Sentinel-User-123")
+                const peer = new Peer();
+                
+                peer.on('open', (id) => {
+                    setMyPeerId(id);
+                    console.log('Mi ID de Sentinel es: ' + id);
+                });
+
+                // Escuchar llamadas entrantes (Cuando tu esposa se conecte a ti)
+                peer.on('call', (call) => {
+                    call.answer(); // Contestamos automáticamente
+                    call.on('stream', (remoteStream) => {
+                        if (remoteVideoRef.current) {
+                            remoteVideoRef.current.srcObject = remoteStream;
+                            remoteVideoRef.current.play();
+                        }
+                    });
+                });
+
+                peerInstance.current = peer;
+            }, []);
+
+            const startTransmitting = async () => {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { facingMode: "environment" }, 
+                        video: { facingMode: { ideal: "environment" } }, 
                         audio: false 
                     });
                     if (videoRef.current) {
                         videoRef.current.srcObject = stream;
+                        videoRef.current.play();
                         setIsStreaming(true);
                     }
+                    // Aquí podrías llamar a un ID específico si lo tuvieras
                 } catch (err) {
-                    alert("Error: Permiso de cámara denegado o no encontrada.");
+                    alert("Error en cámara: " + err.message);
                 }
             };
 
             return (
-                <div className="min-h-screen bg-black text-cyan-500 font-mono p-4">
-                    <header className="border-b border-cyan-900 pb-2 mb-4 flex justify-between items-center">
+                <div className="min-h-screen p-4 flex flex-col gap-4">
+                    <header className="border-b border-cyan-900 pb-2 flex justify-between items-center">
                         <div>
-                            <h1 className="text-2xl font-bold text-white tracking-widest">SENTINEL <span className="text-cyan-500">V4.1</span></h1>
-                            <p className="text-[10px] text-green-500 animate-pulse">SISTEMA OPERATIVO - MODO WAR ROOM</p>
+                            <h1 className="text-2xl font-bold text-white tracking-tighter">SENTINEL <span className="text-cyan-500 text-sm">V4.2</span></h1>
+                            <p className="text-[10px] text-green-500 uppercase tracking-widest">ID Operativo: {myPeerId || 'Iniciando...'}</p>
                         </div>
                     </header>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                        <div className="lg:col-span-8 border border-cyan-900 h-[400px] lg:h-[600px] relative bg-slate-950">
-                            <iframe
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
+                        {/* MAPA IZQUIERDA */}
+                        <div className="lg:col-span-8 bg-slate-950 border border-cyan-900 relative">
+                             <iframe
                                 src="https://www.openstreetmap.org/export/embed.html?bbox=-57.65,-38.05,-57.42,-37.96&layer=mapnik"
-                                className="w-full h-full border-0 opacity-40 grayscale"
+                                className="w-full h-full border-0 opacity-30 grayscale invert"
                             />
+                            <div className="absolute inset-0 pointer-events-none border-inner shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]"></div>
                         </div>
 
+                        {/* FEEDS DERECHA */}
                         <div className="lg:col-span-4 flex flex-col gap-4">
-                            <SentinelVision label="TACTICAL_FEED_01" />
+                            {/* FEED REMOTO (Lo que ve tu esposa) */}
+                            <div className="border border-red-900 bg-black p-1">
+                                <div className="bg-red-950/20 text-[10px] p-1 flex justify-between text-red-500">
+                                    <span>● LIVE_ALMACEN_FEED</span>
+                                    <span className="animate-pulse">REC</span>
+                                </div>
+                                <div className="aspect-video bg-black flex items-center justify-center">
+                                    <video ref={remoteVideoRef} playsInline autoPlay muted className="w-full h-full object-cover border border-red-500/30" />
+                                </div>
+                            </div>
+
+                            {/* MI CÁMARA LOCAL */}
                             <div className="border border-cyan-900 bg-black p-2">
-                                <p className="text-[10px] text-cyan-600 mb-2 underline text-center">CAM_UNIT_REMOTE</p>
-                                <div className="aspect-video bg-slate-900 flex items-center justify-center relative overflow-hidden border border-cyan-500/30">
+                                <p className="text-[10px] text-cyan-600 mb-2 uppercase tracking-tighter">Mi Terminal Movil</p>
+                                <div className="aspect-video bg-slate-900 flex items-center justify-center relative overflow-hidden">
                                     {isStreaming ? (
-                                        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                                        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                                     ) : (
                                         <button 
-                                            onClick={startCamera}
-                                            className="bg-cyan-900/20 border-2 border-cyan-500 px-6 py-3 text-xs hover:bg-cyan-500 hover:text-black font-bold transition-all shadow-[0_0_15px_rgba(0,242,255,0.3)]"
+                                            onClick={startTransmitting}
+                                            className="bg-cyan-950/40 border border-cyan-500 text-cyan-400 px-4 py-2 text-[10px] hover:bg-cyan-500 hover:text-black transition-all"
                                         >
-                                            ACTIVAR CÁMARA TRASERA
+                                            INICIAR TRANSMISIÓN
                                         </button>
                                     )}
                                 </div>
