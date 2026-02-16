@@ -3,474 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CORE Control Center - Smart Tech</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2?v=1.1"></script>
+    <title>SENTINEL V4.1 - Smart Tech</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=VT323&display=swap&v=1.1" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=VT323&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
     <style>
         :root {
             --neon-cyan: #00f2ff;
             --dark-bg: #050508;
-            --grid-green: rgba(0, 180, 160, 0.06);
-            --grid-blue: rgba(0, 140, 200, 0.05);
         }
-        * { box-sizing: border-box; }
         body {
             margin: 0;
-            min-height: 100vh;
-            overflow: hidden;
             background: var(--dark-bg);
             color: var(--neon-cyan);
-            font-family: 'VT323', 'JetBrains Mono', 'Courier New', monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
+            font-family: 'JetBrains Mono', monospace;
         }
-        /* Fondo: cuadrícula oscura con tonos verdes/azules muy sutiles */
-        .grid-bg {
-            position: fixed;
-            inset: 0;
-            z-index: 0;
-            background:
-                linear-gradient(165deg, rgba(0, 25, 35, 0.97) 0%, rgba(5, 15, 25, 0.98) 50%, rgba(0, 20, 30, 0.97) 100%);
-        }
-        .grid-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 1;
-            pointer-events: none;
-            background-image:
-                linear-gradient(var(--grid-green) 1px, transparent 1px),
-                linear-gradient(90deg, var(--grid-green) 1px, transparent 1px),
-                linear-gradient(var(--grid-blue) 1px, transparent 1px),
-                linear-gradient(90deg, var(--grid-blue) 1px, transparent 1px);
-            background-size: 24px 24px, 24px 24px, 48px 48px, 48px 48px;
-            opacity: 0.9;
-        }
-        .grid-glow {
-            position: fixed;
-            inset: 0;
-            z-index: 0;
-            pointer-events: none;
-            background: radial-gradient(ellipse 80% 50% at 50% 40%, rgba(0, 180, 180, 0.04) 0%, transparent 60%);
-        }
-
-        .login-screen {
-            position: relative;
-            z-index: 5;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .login-screen.shake {
-            animation: login-shake 0.55s ease-in-out;
-        }
-        @keyframes login-shake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
-            20%, 40%, 60%, 80% { transform: translateX(8px); }
-        }
-
-        h1 {
-            position: absolute;
-            top: clamp(16px, 4vw, 28px);
-            left: 50%;
-            transform: translateX(-50%);
-            font-family: 'VT323', 'JetBrains Mono', monospace;
-            font-size: clamp(1.2rem, 3.5vw, 1.6rem);
-            color: rgba(0, 242, 255, 0.9);
-            margin: 0;
-            letter-spacing: 4px;
-            z-index: 10;
-        }
-
-        /* Ojo: círculo concéntrico neón en el centro */
-        .eye-wrap {
-            position: relative;
-            width: clamp(160px, 26vw, 280px);
-            height: clamp(160px, 26vw, 280px);
-            margin-bottom: 20px;
-            transition: transform 0.12s ease-out;
-            z-index: 2;
-        }
-        .eye-wrap .eye-svg {
-            width: 100%;
-            height: 100%;
-            display: block;
-            color: #00ffff;
-            filter: drop-shadow(0 0 20px rgba(0, 242, 255, 0.6));
-            transform-origin: 50% 50%;
-            transition: filter 0.3s, transform 0.4s;
-        }
-        .eye-wrap.error .eye-svg {
-            animation: eye-contract 0.35s ease-out forwards, eye-blink-red 0.6s ease-in-out 0.4s 3;
-            filter: drop-shadow(0 0 25px rgba(180, 0, 40, 0.9));
-        }
-        .eye-wrap.error .eye-svg path,
-        .eye-wrap.error .eye-svg circle,
-        .eye-wrap.error .eye-svg line { stroke: #b00028 !important; fill: transparent !important; }
-        .eye-wrap.error .eye-svg .lens-dot { fill: #b00028 !important; }
-        .eye-wrap.success .eye-svg {
-            animation: eye-dilate 0.5s ease-out forwards;
-            filter: drop-shadow(0 0 35px rgba(0, 242, 255, 0.95));
-        }
-        .eye-wrap.success .eye-svg path,
-        .eye-wrap.success .eye-svg circle,
-        .eye-wrap.success .eye-svg line { stroke: #00f2ff !important; }
-        .eye-wrap.success .eye-svg .lens-dot { fill: #00f2ff !important; }
-        .eye-ring.ring-1 { animation: ring-rotate 8s linear infinite; }
-        .eye-ring.ring-2 { animation: ring-rotate-rev 6s linear infinite; }
-        .eye-ring.ring-3 { animation: ring-rotate 4s linear infinite; }
-        .iris-lines { transform-origin: 40px 40px; animation: iris-blink 2.5s ease-in-out infinite; }
-        .eye-ring, .iris-lines { transform-origin: 40px 40px; }
-        @keyframes ring-rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes ring-rotate-rev { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
-        @keyframes iris-blink { 0%, 100% { opacity: 0.9; } 50% { opacity: 1; } }
-        @keyframes eye-contract { to { transform: scale(0.65); } }
-        @keyframes eye-blink-red {
-            0%, 100% { opacity: 1; filter: drop-shadow(0 0 25px rgba(180, 0, 40, 0.9)); }
-            50% { opacity: 0.35; filter: drop-shadow(0 0 8px rgba(180, 0, 40, 0.5)); }
-        }
-        @keyframes eye-dilate { to { transform: scale(1.15); } }
-
-        /* Scanline al acceder */
-        .scanline {
-            position: fixed;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(180deg, transparent, rgba(0, 242, 255, 0.9), transparent);
-            box-shadow: 0 0 30px 8px rgba(0, 242, 255, 0.5);
-            top: -10%;
-            z-index: 20;
-            pointer-events: none;
-            opacity: 0;
-        }
-        .scanline.run {
-            opacity: 1;
-            animation: scanline-down 1.2s ease-in-out forwards;
-        }
-        @keyframes scanline-down {
-            0% { top: -10%; }
-            100% { top: 110%; }
-        }
-
-        .login-msg {
-            position: fixed;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 90%;
-            max-width: 420px;
-            text-align: center;
-            font-family: 'VT323', 'JetBrains Mono', monospace;
-            font-size: clamp(1.1rem, 3vw, 1.5rem);
-            letter-spacing: 3px;
-            z-index: 15;
-            opacity: 0;
-            pointer-events: none;
-            top: 68%;
-        }
-        .login-msg.visible { opacity: 1; transition: opacity 0.3s; }
-        .login-msg.granted { color: #00f2ff; text-shadow: 0 0 20px rgba(0, 242, 255, 0.8); }
-        .login-msg.denied { color: #b00028; text-shadow: 0 0 15px rgba(180, 0, 40, 0.9); }
-
-        /* Formulario: cuadro IDENTIFICACIÓN / CLAVE DE ACCESO / VERIFICAR */
-        .form-wrap {
-            position: relative;
-            z-index: 10;
-            width: 100%;
-            max-width: 340px;
-            padding: 20px 24px;
-            margin-top: auto;
-            margin-bottom: clamp(24px, 6vw, 48px);
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border: 1px solid rgba(0, 242, 255, 0.35);
-            clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
-            box-shadow: 0 0 40px rgba(0, 242, 255, 0.08), inset 0 0 30px rgba(0, 0, 0, 0.2);
-        }
-        .form-wrap label {
-            display: block;
-            font-family: 'VT323', 'JetBrains Mono', monospace;
-            font-size: 1.05rem;
-            color: rgba(0, 242, 255, 0.95);
-            margin-bottom: 4px;
-            letter-spacing: 2px;
-        }
-        .form-wrap input {
-            width: 100%;
-            box-sizing: border-box;
-            padding: 10px 12px;
-            margin-bottom: 14px;
-            background: rgba(0, 0, 0, 0.7);
-            border: 1px solid rgba(0, 242, 255, 0.5);
-            color: #00f2ff;
-            font-family: 'VT323', 'JetBrains Mono', monospace;
-            font-size: 1.1rem;
-            letter-spacing: 1px;
-        }
-        .form-wrap input::placeholder { color: rgba(0, 242, 255, 0.35); }
-        .form-wrap input:focus {
-            outline: none;
-            box-shadow: 0 0 16px rgba(0, 242, 255, 0.35);
-            border-color: rgba(0, 242, 255, 0.8);
-        }
-        .form-wrap button[type="submit"] {
-            width: 100%;
-            padding: 12px;
-            font-family: 'VT323', 'JetBrains Mono', monospace;
-            font-size: 1.2rem;
-            letter-spacing: 3px;
-            color: #050508;
-            background: linear-gradient(180deg, #00f2ff 0%, #00a8b3 100%);
-            border: 1px solid rgba(0, 242, 255, 0.8);
-            cursor: pointer;
-            transition: box-shadow 0.2s, filter 0.2s;
-        }
-        .form-wrap button[type="submit"]:hover {
-            filter: brightness(1.15);
-            box-shadow: 0 0 25px rgba(0, 242, 255, 0.5);
-        }
-        .form-wrap button[type="submit"]:disabled {
-            opacity: 0.8;
-            cursor: not-allowed;
-        }
-        .login-error {
-            font-family: 'VT323', monospace;
-            font-size: 1rem;
-            color: #b00028;
-            margin-top: 10px;
-            min-height: 1.2em;
-            letter-spacing: 1px;
-        }
-        .login-toggle { margin: 14px 0 0; text-align: center; }
-        .login-link-btn {
-            background: none;
-            border: none;
-            font-family: 'VT323', 'JetBrains Mono', monospace;
-            font-size: 1rem;
-            color: rgba(0, 242, 255, 0.9);
-            letter-spacing: 2px;
-            cursor: pointer;
-            text-decoration: underline;
-            padding: 4px 8px;
-        }
-        .login-link-btn:hover { color: #00f2ff; text-shadow: 0 0 10px rgba(0, 242, 255, 0.6); }
-
-        /* Formulario de registro (oculto por defecto) */
-        .register-form { display: none; }
     </style>
 </head>
 <body>
 
-    <div class="grid-bg" aria-hidden="true"></div>
-    <div class="grid-overlay" aria-hidden="true"></div>
-    <div class="grid-glow" aria-hidden="true"></div>
+    <div id="root"></div>
 
-    <div id="login-screen" class="login-screen">
-        <h1>CORE CONTROL CENTER</h1>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-        <div id="eye-wrap" class="eye-wrap">
-            <svg class="eye-svg" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                    <filter id="lens-blur" x="-50%" y="-50%" width="200%" height="200%">
-                        <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
-                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                    </filter>
-                </defs>
-                <path class="eye-arc" d="M 14 40 A 26 22 0 0 1 66 40" fill="none" stroke="#00ffff" stroke-width="2"/>
-                <path class="eye-arc" d="M 14 40 A 26 22 0 0 0 66 40" fill="none" stroke="#00ffff" stroke-width="2"/>
-                <circle class="eye-ring ring-1" cx="40" cy="40" r="18" fill="none" stroke="#00ffff" stroke-width="1.2" stroke-dasharray="6 5"/>
-                <circle class="eye-ring ring-2" cx="40" cy="40" r="12" fill="none" stroke="#00ffff" stroke-width="1" stroke-dasharray="4 4"/>
-                <circle class="eye-ring ring-3" cx="40" cy="40" r="6" fill="none" stroke="#00ffff" stroke-width="0.8" stroke-dasharray="2 2"/>
-                <g class="iris-lines">
-                    <line x1="40" y1="40" x2="40" y2="28" stroke="#00ffff" stroke-width="0.6" opacity="0.8"/>
-                    <line x1="40" y1="40" x2="46" y2="31" stroke="#00ffff" stroke-width="0.5" opacity="0.7"/>
-                    <line x1="40" y1="40" x2="52" y2="34" stroke="#00ffff" stroke-width="0.5" opacity="0.7"/>
-                    <line x1="40" y1="40" x2="52" y2="40" stroke="#00ffff" stroke-width="0.5" opacity="0.7"/>
-                    <line x1="40" y1="40" x2="52" y2="46" stroke="#00ffff" stroke-width="0.5" opacity="0.7"/>
-                    <line x1="40" y1="40" x2="46" y2="49" stroke="#00ffff" stroke-width="0.5" opacity="0.7"/>
-                    <line x1="40" y1="40" x2="40" y2="52" stroke="#00ffff" stroke-width="0.6" opacity="0.8"/>
-                    <line x1="40" y1="40" x2="34" y2="49" stroke="#00ffff" stroke-width="0.5" opacity="0.7"/>
-                    <line x1="40" y1="40" x2="28" y2="46" stroke="#00ffff" stroke-width="0.5" opacity="0.7"/>
-                    <line x1="40" y1="40" x2="28" y2="40" stroke="#00ffff" stroke-width="0.5" opacity="0.7"/>
-                    <line x1="40" y1="40" x2="28" y2="34" stroke="#00ffff" stroke-width="0.5" opacity="0.7"/>
-                    <line x1="40" y1="40" x2="34" y2="31" stroke="#00ffff" stroke-width="0.5" opacity="0.7"/>
-                </g>
-                <circle class="lens-dot" cx="40" cy="40" r="3" fill="#00ffff" filter="url(#lens-blur)"/>
-            </svg>
-        </div>
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
 
-        <div id="scanline" class="scanline" aria-hidden="true"></div>
-        <div id="login-msg" class="login-msg" aria-live="polite"></div>
+        // Tu componente SentinelVision
+        const SentinelVision = ({ label = 'Live Feed: Almacén_01' }) => {
+            const VIDEO_ID = '36pY9v6m-48';
+            return (
+                <div className="border-2 border-cyan-500 bg-black p-1 relative mb-4">
+                    <div className="aspect-video bg-slate-900 relative overflow-hidden">
+                        <iframe
+                            src={`https://www.youtube.com/embed/${VIDEO_ID}?autoplay=1&mute=1&controls=0`}
+                            title="Security feed"
+                            className="absolute inset-0 w-full h-full object-cover grayscale opacity-50"
+                        />
+                        <div className="absolute top-2 left-2 flex items-center gap-2">
+                            <div className="h-2 w-2 animate-pulse rounded-full bg-red-600" />
+                            <span className="text-[10px] text-cyan-400 font-mono">{label}</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
-        <div class="form-wrap">
-            <form id="login-form">
-                <label for="login-email">IDENTIFICACIÓN</label>
-                <input type="email" id="login-email" name="email" required placeholder="operator@core.mdq" autocomplete="email">
-                <label for="login-password">CLAVE DE ACCESO</label>
-                <input type="password" id="login-password" name="password" required placeholder="········" autocomplete="current-password">
-                <button type="submit">VERIFICAR</button>
-                <div id="login-error" class="login-error" aria-live="polite"></div>
-                <p class="login-toggle"><button type="button" id="show-register" class="login-link-btn">CREAR CUENTA</button></p>
-            </form>
-            <form id="register-form" class="register-form">
-                <p class="register-mode-label" style="margin:0 0 12px; font-size:0.9rem; color:rgba(0,242,255,0.8); letter-spacing:2px;">REGISTRO RÁPIDO — Te asignamos una unidad y vas directo a la baliza.</p>
-                <label for="register-email">IDENTIFICACIÓN</label>
-                <input type="email" id="register-email" name="email" required placeholder="operator@core.mdq" autocomplete="email">
-                <label for="register-password">CLAVE DE ACCESO</label>
-                <input type="password" id="register-password" name="password" required placeholder="········" autocomplete="new-password" minlength="6">
-                <label for="register-confirm">CONFIRMAR CLAVE</label>
-                <input type="password" id="register-confirm" name="confirm" required placeholder="········" autocomplete="new-password" minlength="6">
-                <button type="submit">REGISTRAR E IR A BALIZA</button>
-                <div id="register-error" class="login-error" aria-live="polite"></div>
-                <p class="login-toggle"><button type="button" id="show-login" class="login-link-btn">YA TENGO CUENTA</button></p>
-            </form>
-        </div>
-    </div>
+        // Tu componente WarRoom principal
+        const WarRoom = () => {
+            const [isStreaming, setIsStreaming] = useState(false);
+            const videoRef = useRef(null);
 
-    <script>
-        const SUPABASE_URL = 'https://svpurpvbiujhcbiugrkh.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2cHVycHZiaXVqaGNiaXVncmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NDgzMTUsImV4cCI6MjA4MzMyNDMxNX0.AivKJ0_N0z_4T4vLNfUcE2hepJ1XXOO8-4fSA3PJXdc';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            const startCamera = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: "environment" }, 
+                        audio: false 
+                    });
+                    if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                        setIsStreaming(true);
+                    }
+                } catch (err) {
+                    alert("Error: Permiso de cámara denegado o no encontrada.");
+                }
+            };
 
-        const loginScreen = document.getElementById('login-screen');
-        const eyeWrap = document.getElementById('eye-wrap');
-        const loginForm = document.getElementById('login-form');
-        const registerForm = document.getElementById('register-form');
-        const loginError = document.getElementById('login-error');
-        const registerError = document.getElementById('register-error');
-        const loginMsg = document.getElementById('login-msg');
-        const scanline = document.getElementById('scanline');
+            return (
+                <div className="min-h-screen bg-black text-cyan-500 font-mono p-4">
+                    <header className="border-b border-cyan-900 pb-2 mb-4 flex justify-between items-center">
+                        <div>
+                            <h1 className="text-2xl font-bold text-white tracking-widest">SENTINEL <span className="text-cyan-500">V4.1</span></h1>
+                            <p className="text-[10px] text-green-500 animate-pulse">SISTEMA OPERATIVO - MODO WAR ROOM</p>
+                        </div>
+                    </header>
 
-        // Ojo sigue el ratón
-        document.addEventListener('mousemove', function (ev) {
-            if (eyeWrap.classList.contains('error') || eyeWrap.classList.contains('success')) return;
-            var cx = window.innerWidth / 2;
-            var cy = window.innerHeight * 0.42;
-            var dx = ev.clientX - cx;
-            var dy = ev.clientY - cy;
-            var angleDeg = (Math.atan2(dy, dx) * 180 / Math.PI) + 90;
-            eyeWrap.style.transform = 'rotate(' + angleDeg + 'deg)';
-        });
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                        <div className="lg:col-span-8 border border-cyan-900 h-[400px] lg:h-[600px] relative bg-slate-950">
+                            <iframe
+                                src="https://www.openstreetmap.org/export/embed.html?bbox=-57.65,-38.05,-57.42,-37.96&layer=mapnik"
+                                className="w-full h-full border-0 opacity-40 grayscale"
+                            />
+                        </div>
 
-        document.getElementById('show-register').addEventListener('click', function () {
-            loginForm.style.display = 'none';
-            registerForm.style.display = 'block';
-            registerForm.classList.remove('register-form');
-            registerError.textContent = '';
-        });
-        document.getElementById('show-login').addEventListener('click', function () {
-            registerForm.style.display = 'none';
-            registerForm.classList.add('register-form');
-            loginForm.style.display = 'block';
-            loginError.textContent = '';
-        });
+                        <div className="lg:col-span-4 flex flex-col gap-4">
+                            <SentinelVision label="TACTICAL_FEED_01" />
+                            <div className="border border-cyan-900 bg-black p-2">
+                                <p className="text-[10px] text-cyan-600 mb-2 underline text-center">CAM_UNIT_REMOTE</p>
+                                <div className="aspect-video bg-slate-900 flex items-center justify-center relative overflow-hidden border border-cyan-500/30">
+                                    {isStreaming ? (
+                                        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                                    ) : (
+                                        <button 
+                                            onClick={startCamera}
+                                            className="bg-cyan-900/20 border-2 border-cyan-500 px-6 py-3 text-xs hover:bg-cyan-500 hover:text-black font-bold transition-all shadow-[0_0_15px_rgba(0,242,255,0.3)]"
+                                        >
+                                            ACTIVAR CÁMARA TRASERA
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
-        registerForm.addEventListener('submit', async function (e) {
-            e.preventDefault();
-            registerError.textContent = '';
-            var email = document.getElementById('register-email').value.trim();
-            var password = document.getElementById('register-password').value;
-            var confirm = document.getElementById('register-confirm').value;
-            if (password !== confirm) {
-                registerError.textContent = 'Las claves no coinciden';
-                return;
-            }
-            var btn = registerForm.querySelector('button[type="submit"]');
-            btn.disabled = true;
-            btn.textContent = 'REGISTRANDO...';
-            var res = await supabaseClient.auth.signUp({ email: email, password: password });
-            if (res.error) {
-                btn.disabled = false;
-                btn.textContent = 'REGISTRAR E IR A BALIZA';
-                registerError.textContent = res.error.message || 'Error al crear cuenta';
-                return;
-            }
-            if (res.data.user) {
-                await supabaseClient.from('profiles').upsert({
-                    id: res.data.user.id,
-                    email: res.data.user.email,
-                    role: 'UNIDAD_MOVIL'
-                }, { onConflict: 'id' });
-            }
-            btn.textContent = 'REDIRIGIENDO A BALIZA...';
-            loginMsg.textContent = 'REGISTRO RÁPIDO OK. ASIGNANDO UNIDAD...';
-            loginMsg.classList.add('visible', 'granted');
-            var signIn = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
-            if (signIn.error) {
-                loginMsg.textContent = 'CUENTA CREADA. INICIA SESIÓN PARA IR A LA BALIZA.';
-                setTimeout(function () {
-                    registerForm.style.display = 'none';
-                    registerForm.classList.add('register-form');
-                    loginForm.style.display = 'block';
-                    document.getElementById('login-email').value = email;
-                    btn.disabled = false;
-                    btn.textContent = 'REGISTRAR E IR A BALIZA';
-                    loginMsg.classList.remove('visible', 'granted');
-                    loginMsg.textContent = '';
-                }, 3000);
-                return;
-            }
-            window.location.href = 'track.html';
-        });
-
-        loginForm.addEventListener('submit', async function (e) {
-            e.preventDefault();
-            loginError.textContent = '';
-            loginMsg.classList.remove('visible', 'granted', 'denied');
-            loginMsg.textContent = '';
-            var email = document.getElementById('login-email').value.trim();
-            var password = document.getElementById('login-password').value;
-            var btn = loginForm.querySelector('button[type="submit"]');
-            var btnText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = 'VERIFICANDO...';
-            eyeWrap.classList.remove('error', 'success');
-
-            var res = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
-
-            if (res.error) {
-                btn.disabled = false;
-                btn.textContent = btnText;
-                eyeWrap.classList.add('error');
-                loginScreen.classList.add('shake');
-                loginMsg.textContent = 'CRITICAL ERROR: BIOMETRIC MISMATCH';
-                loginMsg.classList.add('visible', 'denied');
-                loginError.textContent = res.error.message || 'Acceso denegado';
-                setTimeout(function () {
-                    loginScreen.classList.remove('shake');
-                    eyeWrap.classList.remove('error');
-                    loginMsg.classList.remove('visible', 'denied');
-                    loginMsg.textContent = '';
-                }, 2600);
-                return;
-            }
-
-            btn.textContent = 'ACCESO CONCEDIDO';
-            eyeWrap.classList.add('success');
-            loginMsg.textContent = 'ACCESS GRANTED. WELCOME TO THE WAR ROOM.';
-            loginMsg.classList.add('visible', 'granted');
-            scanline.classList.add('run');
-            setTimeout(function () {
-                window.location.href = 'dashboard.html';
-            }, 1800);
-        });
-
-        // Si ya hay sesión, ir directo al War Room (dashboard)
-        supabaseClient.auth.getSession().then(function (r) {
-            if (r.data.session) {
-                window.location.href = 'dashboard.html';
-            }
-        });
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<WarRoom />);
     </script>
 </body>
 </html>
