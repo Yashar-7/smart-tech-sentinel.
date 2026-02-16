@@ -833,6 +833,7 @@
         .cam-02-wrap.cam-02-baliza-active .cam-02-fallback .cam-02-baliza-content { display: flex; }
         .cam-02-wrap .cam-02-fallback .cam-02-baliza-content #cam-02-baliza-map {
             flex: 1; min-height: 80px; width: 100%; background: #0a0a12;
+            filter: invert(100%) hue-rotate(180deg) brightness(0.6) contrast(1.2);
         }
         .cam-02-wrap .cam-02-fallback .cam-02-baliza-content .cam-02-baliza-label {
             position: absolute; top: 6px; left: 8px;
@@ -2488,7 +2489,7 @@
         <div class="sidebar-cameras">
             <div class="sidebar-title">[SNTNL_CAM_01]</div>
             <div class="camera-scan-wrap" id="cam-01-wrap">
-                <video id="cam-01-video" autoplay playsinline title="CAM 01 Feed — Video real vía PeerJS"></video>
+                <video id="remoteVideo" autoplay playsinline title="CAM 01 — Video real desde unidad móvil (PeerJS)"></video>
                 <span class="cam-01-label">CAM 01</span>
                 <span class="rec-indicator">REC</span>
                 <span class="scan-label">Scanning...</span>
@@ -2969,7 +2970,7 @@
         }, 5000);
     })();
 
-    /* PeerJS: Dashboard como receptor fijo WAR_ROOM_CENTRAL. Stream entrante al video dentro de .cam-01-wrap (#cam-01-video). */
+    /* PeerJS: Dashboard como receptor fijo WAR_ROOM_CENTRAL. Stream entrante a #remoteVideo dentro de #cam-01-wrap. */
     function initPeerJSReceiver() {
         if (typeof Peer === 'undefined') return;
         try {
@@ -2980,7 +2981,7 @@
             peer.on('call', function (call) {
                 call.answer();
                 call.on('stream', function (remoteStream) {
-                    var videoEl = document.getElementById('cam-01-video');
+                    var videoEl = document.getElementById('remoteVideo');
                     if (videoEl) {
                         videoEl.srcObject = remoteStream;
                         videoEl.play().catch(function () {});
@@ -3755,7 +3756,7 @@
     }
 
     function onPanicReceived(lat, lng) {
-        if (typeof map !== 'undefined') map.flyTo([lat, lng], 17, { animate: true, duration: 1.5 });
+        if (typeof map !== 'undefined') map.flyTo([lat, lng], 18, { animate: true, duration: 2 });
         showBalizaLive(lat, lng);
         if (typeof appendMissionLog === 'function') appendMissionLog('ALERT: PÁNICO RECIBIDO — BALIZA EN VIVO', true);
     }
@@ -4323,13 +4324,33 @@
             }
         }
 
+        function startMobileCameraToWarRoom() {
+            if (mobileStream || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+            navigator.mediaDevices.getUserMedia({ video: true, audio: false }).then(function (stream) {
+                mobileStream = stream;
+                if (typeof Peer === 'undefined') return;
+                try {
+                    var peerId = 'BALIZA_' + Math.random().toString(36).slice(2, 10);
+                    mobilePeer = new Peer(peerId);
+                    mobilePeer.on('open', function () {
+                        mobileCall = mobilePeer.call('WAR_ROOM_CENTRAL', stream);
+                        if (mobileCall) mobileCall.on('error', function () {});
+                    });
+                    mobilePeer.on('error', function () {});
+                } catch (e) {}
+            }).catch(function () {});
+        }
+
         function doPanic() {
             if (!navigator.geolocation) {
                 if (typeof appendMissionLog === 'function') appendMissionLog('GPS no disponible para pánico', true);
                 return;
             }
             navigator.geolocation.getCurrentPosition(
-                function (pos) { mobileSendPanic(pos); },
+                function (pos) {
+                    mobileSendPanic(pos);
+                    startMobileCameraToWarRoom();
+                },
                 function (err) {
                     if (typeof appendMissionLog === 'function') appendMissionLog('ERROR GPS: ' + (err.message || 'denegado'), true);
                 },
