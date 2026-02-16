@@ -618,6 +618,46 @@
             background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
         }
         .sidebar-cameras { position: relative; }
+        .camera-grid-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            width: 100%;
+            min-height: 80px;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        .camera-grid-container .video-box-unit {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16/9;
+            overflow: hidden;
+            background: #0a0a0a;
+            border: 2px solid rgba(0, 242, 255, 0.3);
+            box-shadow: 0 0 12px rgba(0, 242, 255, 0.15);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .camera-grid-container .video-box-unit:hover {
+            border-color: rgba(0, 242, 255, 0.6);
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.25);
+        }
+        .camera-grid-container .video-box-unit video {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover; display: block; background: #000;
+            filter: hue-rotate(90deg) contrast(150%);
+        }
+        .camera-grid-container .video-box-unit .video-box-label {
+            position: absolute; top: 6px; left: 8px; z-index: 3;
+            font-size: 0.6rem; font-weight: 700; letter-spacing: 2px;
+            color: #ff0040; text-shadow: 0 0 8px rgba(255, 0, 64, 0.9);
+            font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+            animation: rec-blink 1.2s ease-in-out infinite;
+        }
+        .camera-grid-container .video-box-unit .video-box-rec {
+            position: absolute; top: 6px; right: 8px; z-index: 3;
+            font-size: 0.55rem; font-weight: 700; letter-spacing: 1px;
+            color: var(--fluor-green); text-shadow: 0 0 6px var(--fluor-green-glow);
+        }
         @keyframes cam-glitch-flicker {
             0%, 70% { opacity: 1; }
             35% { opacity: 0.85; }
@@ -2485,24 +2525,10 @@
         <button type="button" class="estado-drawer-tab" id="estado-drawer-tab" aria-expanded="false" aria-controls="estado-drawer-inner">ESTADO</button>
         <div id="estado-drawer-inner" class="estado-drawer-inner" role="region" aria-label="Estado del sistema y cámaras">
     <aside class="sidebar" id="dashboard-sidebar">
-        <!-- Cámaras: CAM 01 — video directo calle de noche + overlay + cuadros que siguen -->
+        <!-- Multicámara real-time: contenedor flexible que recibe una caja por unidad (PeerJS) -->
         <div class="sidebar-cameras">
-            <div class="sidebar-title">[SNTNL_CAM_01]</div>
-            <div class="camera-scan-wrap" id="cam-01-wrap">
-                <video id="remoteVideo" autoplay playsinline title="CAM 01 — Video real desde unidad móvil (PeerJS)"></video>
-                <span class="cam-01-label">CAM 01</span>
-                <span class="rec-indicator">REC</span>
-                <span class="scan-label">Scanning...</span>
-                <div class="scan-overlay"></div>
-                <div class="scanlines-overlay" aria-hidden="true"></div>
-                <div class="scan-line"></div>
-                <div class="detection-boxes" id="detection-boxes">
-                    <div class="detection-box track-1"></div>
-                    <div class="detection-box track-2"></div>
-                    <div class="detection-box track-3"></div>
-                    <div class="detection-box track-4"></div>
-                </div>
-            </div>
+            <div class="sidebar-title">[SNTNL_CAM_MULTI]</div>
+            <div class="camera-grid-container" id="camera-grid-container"></div>
             <!-- CAM 02: video directo cámara tráfico MDQ o fallback imagen estática -->
             <div class="camera-scan-wrap cam-02-wrap" id="cam-02-wrap">
                 <video id="cam-02-video" autoplay playsinline title="CAM 02 MDQ"></video>
@@ -2970,22 +2996,46 @@
         }, 5000);
     })();
 
-    /* PeerJS: Dashboard como receptor fijo WAR_ROOM_CENTRAL. Stream entrante a #remoteVideo dentro de #cam-01-wrap. */
+    /* PeerJS: Multicámara — cada unidad que llama crea su propio recuadro neón; limpieza al dejar de transmitir. */
     function initPeerJSReceiver() {
         if (typeof Peer === 'undefined') return;
+        var videoGrid = document.getElementById('camera-grid-container');
+        if (!videoGrid) return;
         try {
             var peer = new Peer('WAR_ROOM_CENTRAL');
             peer.on('open', function () {
-                if (typeof appendMissionLog === 'function') appendMissionLog('[ PEERJS ] WAR_ROOM_CENTRAL listo — esperando video de unidad móvil', false);
+                if (typeof appendMissionLog === 'function') appendMissionLog('[ PEERJS ] WAR_ROOM_CENTRAL — multicámara lista', false);
             });
             peer.on('call', function (call) {
+                var unitId = call.peer;
                 call.answer();
                 call.on('stream', function (remoteStream) {
-                    var videoEl = document.getElementById('remoteVideo');
+                    var videoBox = document.getElementById('video-box-' + unitId);
+                    if (!videoBox) {
+                        videoBox = document.createElement('div');
+                        videoBox.id = 'video-box-' + unitId;
+                        videoBox.className = 'video-box-unit';
+                        videoBox.innerHTML = '<video id="video-' + unitId.replace(/"/g, '&quot;') + '" autoplay playsinline title="' + unitId + '"></video>' +
+                            '<span class="video-box-label">LIVE: ' + unitId.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>' +
+                            '<span class="video-box-rec">REC</span>';
+                        videoGrid.appendChild(videoBox);
+                    }
+                    var videoEl = document.getElementById('video-' + unitId);
                     if (videoEl) {
                         videoEl.srcObject = remoteStream;
                         videoEl.play().catch(function () {});
                     }
+                    function removeBoxWhenStreamEnded() {
+                        var tracks = remoteStream.getTracks();
+                        var allEnded = tracks.length === 0 || tracks.every(function (t) { return t.readyState === 'ended'; });
+                        if (allEnded) {
+                            var box = document.getElementById('video-box-' + unitId);
+                            if (box) box.remove();
+                        }
+                    }
+                    remoteStream.getTracks().forEach(function (track) {
+                        track.onended = removeBoxWhenStreamEnded;
+                    });
                 });
             });
             peer.on('error', function (err) {
