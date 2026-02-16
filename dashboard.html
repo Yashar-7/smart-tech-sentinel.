@@ -114,7 +114,11 @@
             background: currentColor;
             border-radius: 1px;
         }
+        .btn-logout-icon { display: none; }
         @media (max-width: 768px) {
+            .btn-logout-text { display: none !important; }
+            .btn-logout-icon { display: inline-flex !important; align-items: center; justify-content: center; }
+            .btn-logout-wrap { min-width: 44px; padding: 8px 10px; margin-left: 6px !important; }
             .btn-menu-toggle { display: flex !important; }
             .stats-hub { display: none; }
             .panels-open .panels-overlay {
@@ -164,35 +168,49 @@
             transform: scale(1.05);
         }
         .fab-baliza:active { transform: scale(0.98); }
-        /* === Estilos añadidos solo para botones móvil (baliza/pánico). No modifican HUD, #map, .leaflet-* ni radar. === */
+        .fab-baliza.running {
+            background: rgba(255, 0, 64, 0.25);
+            border-color: var(--alert-red);
+            color: var(--alert-red);
+            box-shadow: 0 0 20px rgba(255, 0, 64, 0.5);
+            animation: fab-baliza-pulse 1.2s ease-in-out infinite;
+        }
+        @keyframes fab-baliza-pulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(255, 0, 64, 0.5); opacity: 1; }
+            50% { box-shadow: 0 0 30px rgba(255, 0, 64, 0.8); opacity: 0.9; }
+        }
+        /* PÁNICO: siempre distinto (rojo, arriba del BALIZA); no usa .running */
         .fab-panic {
             bottom: 96px;
             right: 24px;
             background: rgba(255, 0, 64, 0.2);
             border-color: var(--alert-red);
             color: var(--alert-red);
+            font-weight: 700;
         }
         .fab-panic:hover { background: rgba(255, 0, 64, 0.35); }
         .fab-panic.sent { color: #00ff88; border-color: #00ff88; background: rgba(0, 255, 136, 0.2); }
         .btn-panic { color: var(--alert-red); border-color: var(--alert-red); }
         .btn-panic:hover { background: rgba(255, 0, 64, 0.15); }
         .mobile-name-bar {
-            position: fixed; bottom: 100px; left: 16px; right: 16px; z-index: 9998;
-            display: none; flex-direction: column; gap: 6px;
+            position: fixed; bottom: 100px; left: 12px; right: 12px; z-index: 9998;
+            display: none; flex-direction: row; align-items: center; gap: 8px;
+            background: rgba(10, 10, 20, 0.92); border: 1px solid rgba(0, 242, 255, 0.35);
+            border-radius: 8px; padding: 6px 10px; box-shadow: 0 0 12px rgba(0, 242, 255, 0.1);
         }
+        .mobile-name-bar.hidden { display: none !important; }
         .mobile-name-label {
             font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
-            font-size: 0.65rem; font-weight: 600; letter-spacing: 1px;
-            color: var(--neon-cyan); text-shadow: 0 0 8px rgba(0, 242, 255, 0.5);
+            font-size: 0.6rem; font-weight: 600; letter-spacing: 0.5px;
+            color: var(--neon-cyan); white-space: nowrap;
         }
         .mobile-name-input {
-            width: 100%; padding: 10px 12px; font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem; color: var(--neon-cyan); background: rgba(10, 10, 20, 0.95);
-            border: 2px solid rgba(0, 242, 255, 0.4); border-radius: 6px;
-            box-shadow: 0 0 12px rgba(0, 242, 255, 0.15);
+            flex: 1; min-width: 0; padding: 6px 10px; font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem; color: var(--neon-cyan); background: rgba(0, 20, 30, 0.8);
+            border: 1px solid rgba(0, 242, 255, 0.35); border-radius: 4px;
         }
         .mobile-name-input::placeholder { color: rgba(0, 242, 255, 0.5); }
-        .mobile-name-input:focus { outline: none; border-color: var(--neon-cyan); box-shadow: 0 0 16px rgba(0, 242, 255, 0.3); }
+        .mobile-name-input:focus { outline: none; border-color: var(--neon-cyan); }
         @media (max-width: 768px) {
             .fab-baliza {
                 display: flex;
@@ -889,9 +907,25 @@
         .cam-02-wrap.cam-02-baliza-active .cam-02-fallback .cam-02-silhouette,
         .cam-02-wrap.cam-02-baliza-active .cam-02-fallback .cam-02-heatmap { display: none !important; }
         .cam-02-wrap.cam-02-baliza-active .cam-02-fallback .cam-02-baliza-content { display: flex; }
+        /* Pánico: video en vivo principal; mini-mapa en esquina */
+        .cam-02-wrap .cam-02-fallback .cam-02-baliza-content .cam-02-panic-video-wrap {
+            position: absolute; inset: 0; z-index: 1;
+            background: #000;
+        }
+        .cam-02-wrap .cam-02-fallback .cam-02-baliza-content .cam-02-panic-video-wrap video {
+            width: 100%; height: 100%; object-fit: cover;
+        }
         .cam-02-wrap .cam-02-fallback .cam-02-baliza-content #cam-02-baliza-map {
-            flex: 1; min-height: 80px; width: 100%; background: #0a0a12;
+            position: absolute; bottom: 8px; right: 8px; z-index: 2;
+            width: 120px; height: 90px; border: 2px solid var(--alert-red);
+            border-radius: 4px; background: #0a0a12;
             filter: invert(100%) hue-rotate(180deg) brightness(0.6) contrast(1.2);
+        }
+        .cam-02-wrap .cam-02-fallback .cam-02-baliza-content:not(.cam-02-panic-with-video) #cam-02-baliza-map {
+            position: relative; flex: 1; min-height: 80px; width: 100%;
+        }
+        .cam-02-wrap .cam-02-fallback .cam-02-baliza-content.cam-02-panic-with-video #cam-02-baliza-map {
+            min-height: 0;
         }
         .cam-02-wrap .cam-02-fallback .cam-02-baliza-content .cam-02-baliza-label {
             position: absolute; top: 6px; left: 8px;
@@ -1311,6 +1345,28 @@
         }
         @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
+        /* Barra fija al pie: Reporte, Mission Log, Descargar — siempre visible, sin tapar */
+        .dashboard-footer-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 0 16px;
+            background: rgba(0, 12, 18, 0.97);
+            border-top: 2px solid rgba(0, 255, 255, 0.35);
+            box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
+            z-index: 1001;
+        }
+        .dashboard-footer-bar .btn-cyberpunk,
+        .dashboard-footer-bar .btn-download-log {
+            font-size: 0.7rem;
+        }
+        .app-dashboard { padding-bottom: 56px; }
         .panel-alertas {
             height: 180px; background: var(--dark-bg);
             overflow-y: auto; border-top: 2px solid var(--neon-cyan);
@@ -1487,28 +1543,36 @@
 
         /* Pestaña del drawer de telemetría: solo visible en móvil */
         .telemetry-drawer-tab { display: none; }
+        /* En desktop: ocultar bloque central (telemetría); mapa se expande hasta el panel de cámaras */
+        #telemetry-drawer { display: none !important; }
         /* Drawer ESTADO: en desktop no es drawer, solo contenedor en flujo */
         #estado-drawer { position: relative; bottom: auto; }
         .estado-drawer-tab { display: none; }
         .estado-drawer-inner { max-height: none; overflow: visible; }
-        /* Drawer de paneles (sidebar + unit-health); en desktop en flujo, en móvil overlay */
+        /* Drawer de paneles: solo sidebar (cámaras); mapa ocupa todo el espacio hasta la sidebar */
         .panels-drawer {
             display: flex;
             flex-direction: row;
             z-index: 1002;
             flex-shrink: 0;
         }
-        /* Panel de Salud de Unidades — Bio-Hacker / Iron Man / Ghost in the Shell */
+        /* Panel flotante de unidades: solo visible cuando hay unidad conectada (JS lo muestra) */
         .unit-health-wrap {
-            position: relative;
-            top: 12px;
-            right: auto;
-            z-index: 1002;
-            display: flex;
+            display: none;
+        }
+        .unit-health-floating {
+            display: none;
+            position: fixed;
+            bottom: 60px;
+            left: 16px;
+            z-index: 1003;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
             font-family: 'JetBrains Mono', 'Orbitron', 'Courier New', monospace;
-            flex-shrink: 0;
+            max-width: 220px;
+        }
+        .unit-health-floating.visible {
+            display: flex;
         }
         .unit-health-panel {
             width: 200px;
@@ -2425,7 +2489,11 @@
         <div class="stat-box">PUNTOS RUTA: <span id="count-ruta" class="stat-num">0</span></div>
     </div>
     <div id="status-global" class="pulse">● REALTIME ACTIVO</div>
-    <button type="button" id="btn-logout" class="btn-command" style="margin-left:8px;" title="Cerrar sesión">CERRAR SESIÓN</button>
+    <button type="button" class="btn-command" id="btn-activar-escaneo" style="display:none;" title="Iniciar red PeerJS para recibir unidades">ACTIVAR MODO ESCANEO</button>
+    <button type="button" id="btn-logout" class="btn-command btn-logout-wrap" style="margin-left:8px;" title="Cerrar sesión" aria-label="Cerrar sesión">
+        <span class="btn-logout-text">CERRAR SESIÓN</span>
+        <span class="btn-logout-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+    </button>
 </header>
 
 <!-- Top Bar: en desktop solo etiqueta; en móvil la lógica baliza/pánico está en este mismo dashboard -->
@@ -2433,12 +2501,12 @@
     <button type="button" class="btn-command top-bar-baliza" id="top-bar-baliza" style="display:none;">BALIZA SENTINEL</button>
     <button type="button" class="btn-command btn-panic" id="top-bar-panic" style="display:none;">PÁNICO</button>
 </div>
-<!-- Móvil: campo nombre/unidad arriba de los botones; se usa como peerID y en Supabase -->
+<!-- Móvil: campo nombre/unidad arriba de los botones; se oculta al activar baliza -->
 <div class="mobile-name-bar" id="mobile-name-bar" style="display:none;">
     <label for="mobile-unit-name" class="mobile-name-label">Tu Nombre o Unidad</label>
-    <input type="text" id="mobile-unit-name" class="mobile-name-input" placeholder="Ej: Patrulla 01, María" maxlength="30" autocomplete="off" />
+    <input type="text" id="mobile-unit-name" class="mobile-name-input" placeholder="Ej: Patrulla 01" maxlength="30" autocomplete="off" />
 </div>
-<button type="button" class="fab-baliza" id="fab-baliza" aria-label="Activar o desactivar Baliza" style="display:none;">BALIZA</button>
+<button type="button" class="fab-baliza" id="fab-baliza" aria-label="Activar o desactivar Baliza" style="display:none;">BALIZA DESACTIVADA</button>
 <button type="button" class="fab-baliza fab-panic" id="fab-panic" aria-label="Enviar señal de pánico" style="display:none;">PÁNICO</button>
 
 <div id="geofence-banner" class="geofence-banner" aria-hidden="true">¡ADVERTENCIA: ZONA RESTRINGIDA!</div>
@@ -2515,23 +2583,6 @@
             <span class="telemetry-drawer-tab-arrow" aria-hidden="true">▲</span>
         </button>
         <div id="telemetry-drawer-inner" class="telemetry-drawer-inner" role="region" aria-label="Telemetría de unidades">
-    <div class="unit-health-wrap">
-        <div class="unit-health-panel" id="health-panel-sim">
-            <div class="unit-health-panel-title">UNIDAD 01 — Sin unidad</div>
-            <div class="unit-health-row"><span class="label">BATTERY</span><span class="value" id="health-sim-battery">—</span></div>
-            <div class="unit-health-row"><span class="label">SIGNAL</span><span class="unit-health-bars" id="health-sim-bars"><span></span><span></span><span></span><span></span><span></span></span></div>
-            <div class="unit-health-row"><span class="label">LAT / LNG</span><span class="value" id="health-sim-coords">—</span></div>
-        </div>
-        <div class="unit-health-panel" id="health-panel-02">
-            <div class="unit-health-panel-title">UNIDAD 02 — Sin unidad</div>
-            <div class="unit-health-row"><span class="label">BATTERY</span><span class="value" id="health-02-battery">—</span></div>
-            <div class="unit-health-row"><span class="label">SIGNAL</span><span class="unit-health-bars" id="health-02-bars"><span></span><span></span><span></span><span></span><span></span></span></div>
-            <div class="unit-health-row"><span class="label">LAT / LNG</span><span class="value" id="health-02-coords">—</span></div>
-        </div>
-        <div class="unit-health-panel unit-health-ping">
-            <div class="unit-health-row"><span class="label">PING (LATENCIA)</span><span class="value" id="telemetry-ping">—</span></div>
-        </div>
-    </div>
     <div class="mission-log" id="mission-log">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <div class="mission-log-title">[MISSION_LOG]</div>
@@ -2570,8 +2621,9 @@
                     <!-- Baliza LIVE: mismo contenedor fallback, modo pánico -->
                     <div class="cam-02-baliza-content" id="cam-02-baliza-content" aria-hidden="true">
                         <button type="button" class="cam-02-baliza-close" id="cam-02-baliza-close" aria-label="Cerrar vista baliza">×</button>
+                        <div class="cam-02-panic-video-wrap" id="cam-02-panic-video-wrap"><!-- Video PeerJS se inyecta aquí en pánico --></div>
                         <div id="cam-02-baliza-map"></div>
-                        <span class="cam-02-baliza-label">BALIZA LIVE — UBICACIÓN EN TIEMPO REAL</span>
+                        <span class="cam-02-baliza-label">BALIZA LIVE — VIDEO EN VIVO</span>
                         <span class="cam-02-baliza-coords" id="cam-02-baliza-coords">—</span>
                     </div>
                 </div>
@@ -2627,6 +2679,17 @@
 <div class="panel-alertas" id="log-alertas">
     <div id="incident-list"></div>
 </div>
+
+<!-- Barra fija al pie: botones de log siempre visibles -->
+<footer class="dashboard-footer-bar" id="dashboard-footer-bar">
+    <button type="button" class="btn-cyberpunk" id="btn-reporte-incidentes-footer">REPORTE DE INCIDENTES</button>
+    <span class="mission-log-title" style="margin:0; font-size:0.7rem;">[MISSION_LOG]</span>
+    <button type="button" class="btn-download-log" id="btn-descargar-log-footer">DESCARGAR LOG</button>
+    <button type="button" class="btn-cyberpunk btn-silence-alarm" id="btn-silenciar-reconocer" title="Silenciar sonido de alerta / Reconocer incidente">SILENCIAR / RECONOCER</button>
+</footer>
+
+<!-- Panel flotante de unidades: solo visible cuando hay al menos una unidad conectada -->
+<div class="unit-health-floating" id="unit-health-floating" aria-hidden="true"></div>
 
 </div><!-- #app-dashboard -->
 
@@ -3183,7 +3246,9 @@
 
     const TYPEWRITER_MS_PER_CHAR = 35;
     const MAX_MISSION_LOG_LINES = 10;
+    var alarmSilenced = false;
     function playAlertBeep() {
+        if (alarmSilenced) return;
         try {
             var ctx = new (window.AudioContext || window.webkitAudioContext)();
             var osc = ctx.createOscillator();
@@ -3471,41 +3536,39 @@
         if (idx !== -1) unidadesLiveOrder.splice(idx, 1);
         updateFirstLiveUnitUI();
     }
-    var DASHBOARD_ID_UNIDAD_01 = 'UNIDAD_01';
-    var DASHBOARD_ID_UNIDAD_02 = 'UNIDAD_02';
-
     function updateFirstLiveUnitUI() {
-        var row = unidadesLiveDataById[DASHBOARD_ID_UNIDAD_01] || null;
-        var panel1 = document.getElementById('health-panel-sim');
-        var title1 = panel1 ? panel1.querySelector('.unit-health-panel-title') : null;
-        var batteryEl = document.getElementById('health-sim-battery');
-        var barsEl = document.getElementById('health-sim-bars');
-        var coordsEl1 = document.getElementById('health-sim-coords');
-        if (title1) title1.textContent = row ? ('UNIDAD 01 — ' + (row.name || 'Baliza')) : 'UNIDAD 01 — Sin unidad';
-        if (batteryEl) batteryEl.textContent = (row && row.battery_pct != null) ? row.battery_pct + '%' : '—';
-        if (batteryEl) batteryEl.classList.toggle('critical', row && row.battery_pct != null && row.battery_pct < 15);
-        if (barsEl) {
-            var bars = (row && row.signal_bars != null) ? Math.min(5, Math.max(0, row.signal_bars)) : 0;
-            var spans = barsEl.querySelectorAll('span');
-            for (var i = 0; i < (spans.length || 0); i++) spans[i].classList.toggle('off', i >= bars);
-        }
-        if (coordsEl1) coordsEl1.textContent = (row && row.lat != null && row.lng != null) ? (Number(row.lat).toFixed(5) + ', ' + Number(row.lng).toFixed(5)) : '—';
-        if (panel1) panel1.classList.toggle('critical', row && ((row.battery_pct != null && row.battery_pct < 15) || (row.signal_bars != null && row.signal_bars === 0)));
-        var row2 = unidadesLiveDataById[DASHBOARD_ID_UNIDAD_02] || null;
-        var panel2 = document.getElementById('health-panel-02');
-        var title2 = panel2 ? panel2.querySelector('.unit-health-panel-title') : null;
-        var battery2 = document.getElementById('health-02-battery');
-        var bars2 = document.getElementById('health-02-bars');
-        var coordsEl2 = document.getElementById('health-02-coords');
-        if (title2) title2.textContent = row2 ? ('UNIDAD 02 — ' + (row2.name || 'Baliza')) : 'UNIDAD 02 — Sin unidad';
-        if (battery2) battery2.textContent = (row2 && row2.battery_pct != null) ? row2.battery_pct + '%' : '—';
-        if (bars2) {
-            var b2 = (row2 && row2.signal_bars != null) ? Math.min(5, Math.max(0, row2.signal_bars)) : 0;
-            var sp2 = bars2.querySelectorAll('span');
-            for (var j = 0; j < (sp2.length || 0); j++) sp2[j].classList.toggle('off', j >= b2);
-        }
-        if (coordsEl2) coordsEl2.textContent = (row2 && row2.lat != null && row2.lng != null) ? (Number(row2.lat).toFixed(5) + ', ' + Number(row2.lng).toFixed(5)) : '—';
         firstLiveUnitId = unidadesLiveOrder.length ? unidadesLiveOrder[0] : null;
+        var floatingEl = document.getElementById('unit-health-floating');
+        if (!floatingEl) { updateSentinelBeamToFirstUnit(); return; }
+        if (unidadesLiveOrder.length === 0) {
+            floatingEl.classList.remove('visible');
+            floatingEl.setAttribute('aria-hidden', 'true');
+            floatingEl.innerHTML = '';
+            updateSentinelBeamToFirstUnit();
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < unidadesLiveOrder.length; i++) {
+            var id = unidadesLiveOrder[i];
+            var row = unidadesLiveDataById[id];
+            if (!row) continue;
+            var name = (row.name || id || 'Unidad').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            var battery = (row.battery_pct != null) ? row.battery_pct + '%' : '—';
+            var bars = (row.signal_bars != null) ? Math.min(5, Math.max(0, row.signal_bars)) : 0;
+            var coords = (row.lat != null && row.lng != null) ? (Number(row.lat).toFixed(5) + ', ' + Number(row.lng).toFixed(5)) : '—';
+            var critical = (row.battery_pct != null && row.battery_pct < 15) || (row.signal_bars != null && row.signal_bars === 0);
+            var barSpans = '';
+            for (var b = 0; b < 5; b++) barSpans += '<span class="' + (b >= bars ? 'off' : '') + '"></span>';
+            html += '<div class="unit-health-panel' + (critical ? ' critical' : '') + '">';
+            html += '<div class="unit-health-panel-title">' + name + '</div>';
+            html += '<div class="unit-health-row"><span class="label">BATTERY</span><span class="value' + (critical ? ' critical' : '') + '">' + battery + '</span></div>';
+            html += '<div class="unit-health-row"><span class="label">SIGNAL</span><span class="unit-health-bars">' + barSpans + '</span></div>';
+            html += '<div class="unit-health-row"><span class="label">LAT / LNG</span><span class="value">' + coords + '</span></div>';
+            html += '</div>';
+        }
+        floatingEl.innerHTML = html;
+        floatingEl.classList.add('visible');
+        floatingEl.setAttribute('aria-hidden', 'false');
         updateSentinelBeamToFirstUnit();
     }
     function updateSentinelBeamToFirstUnit() {
@@ -3791,11 +3854,15 @@
     var balizaMarker = null;
     var balizaLiveActive = false;
 
+    var balizaPanicVideoRestoreParent = null;
+
     function showBalizaLive(lat, lng) {
         if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) return;
         var wrap = document.getElementById('cam-02-wrap');
         var container = document.getElementById('cam-02-baliza-map');
         var coordsEl = document.getElementById('cam-02-baliza-coords');
+        var balizaContent = document.getElementById('cam-02-baliza-content');
+        var panicVideoWrap = document.getElementById('cam-02-panic-video-wrap');
         if (!wrap || !container) return;
         wrap.classList.add('cam-02-baliza-active');
         if (coordsEl) coordsEl.textContent = 'LAT ' + Number(lat).toFixed(5) + ' · LNG ' + Number(lng).toFixed(5);
@@ -3816,6 +3883,23 @@
             balizaMap.setView([lat, lng], balizaMap.getZoom(), { animate: true, duration: 0.5 });
             balizaMarker.setLatLng([lat, lng]);
         }
+
+        if (balizaContent) balizaContent.classList.remove('cam-02-panic-with-video');
+        if (panicVideoWrap) panicVideoWrap.innerHTML = '';
+        balizaPanicVideoRestoreParent = null;
+        var grid = document.getElementById('camera-grid-container');
+        if (grid) {
+            var videoBox = document.getElementById('video-box-UNIDAD_MOBILE') || grid.querySelector('.video-box-unit');
+            var videoEl = videoBox ? videoBox.querySelector('video') : null;
+            if (videoEl && videoEl.srcObject && panicVideoWrap) {
+                balizaPanicVideoRestoreParent = videoEl.parentNode;
+                panicVideoWrap.appendChild(videoEl);
+                videoEl.style.width = '100%';
+                videoEl.style.height = '100%';
+                videoEl.style.objectFit = 'cover';
+                if (balizaContent) balizaContent.classList.add('cam-02-panic-with-video');
+            }
+        }
     }
 
     document.getElementById('cam-02-baliza-close').addEventListener('click', function () {
@@ -3826,6 +3910,18 @@
         balizaLiveActive = false;
         var wrap = document.getElementById('cam-02-wrap');
         if (wrap) wrap.classList.remove('cam-02-baliza-active');
+        var panicVideoWrap = document.getElementById('cam-02-panic-video-wrap');
+        var balizaContent = document.getElementById('cam-02-baliza-content');
+        if (balizaContent) balizaContent.classList.remove('cam-02-panic-with-video');
+        if (panicVideoWrap && panicVideoWrap.firstChild && balizaPanicVideoRestoreParent) {
+            var videoEl = panicVideoWrap.querySelector('video');
+            if (videoEl) {
+                balizaPanicVideoRestoreParent.appendChild(videoEl);
+                videoEl.style.cssText = '';
+            }
+            panicVideoWrap.innerHTML = '';
+        }
+        balizaPanicVideoRestoreParent = null;
     }
 
     function onPanicReceived(lat, lng) {
@@ -4025,6 +4121,7 @@
     }
 
     function playAlertSound() {
+        if (alarmSilenced) return;
         const audio = new (window.AudioContext || window.webkitAudioContext)();
         const osc = audio.createOscillator();
         osc.type = 'sawtooth';
@@ -4120,13 +4217,7 @@
     let pendingDelete = null; // { type: 'incident'|'alert', id, cardEl? }
 
     function ensureIncidentListPlaceholder() {
-        if (!incidentListEl.querySelector('.incident-list-placeholder') && incidentListEl.children.length === 0) {
-            const ph = document.createElement('div');
-            ph.className = 'incident-list-placeholder';
-            ph.style.cssText = 'text-align: center; color: #444; font-size: 0.78rem; padding: 20px;';
-            ph.textContent = 'ESPERANDO TELEMETRÍA...';
-            incidentListEl.appendChild(ph);
-        }
+        // Sin placeholder: el bloque central fue eliminado; el mapa ocupa el espacio.
     }
 
     function openLightbox(src) {
@@ -4227,11 +4318,14 @@
         }
     }
 
-    document.getElementById('btn-reporte-incidentes').addEventListener('click', function () {
+    function openReporteIncidentes() {
         const isOpen = incidentsPanel.classList.toggle('open');
         incidentsPanel.setAttribute('aria-hidden', !isOpen);
         if (isOpen) loadIncidentsPanel();
-    });
+    }
+    document.getElementById('btn-reporte-incidentes').addEventListener('click', openReporteIncidentes);
+    var btnReporteFooter = document.getElementById('btn-reporte-incidentes-footer');
+    if (btnReporteFooter) btnReporteFooter.addEventListener('click', openReporteIncidentes);
     document.getElementById('incidents-panel-close').addEventListener('click', function () {
         incidentsPanel.classList.remove('open');
         incidentsPanel.setAttribute('aria-hidden', 'true');
@@ -4262,6 +4356,8 @@
     }
     document.getElementById('btn-descargar-log').addEventListener('click', downloadMissionLog);
     document.getElementById('btn-descargar-log-panel').addEventListener('click', downloadMissionLog);
+    var btnDescargarFooter = document.getElementById('btn-descargar-log-footer');
+    if (btnDescargarFooter) btnDescargarFooter.addEventListener('click', downloadMissionLog);
 
     var trafficOptions = ['Normal.', 'Bajo.', 'Moderado.', 'Normal.'];
     var trafficIndex = 0;
@@ -4281,7 +4377,28 @@
     iniciarRealtimeIncidentsPanic();
     ensureIncidentListPlaceholder();
 
-    if (!isMobile()) initPeerJSReceiver();
+    if (!isMobile()) {
+        initPeerJSReceiver();
+        var btnEscaneo = document.getElementById('btn-activar-escaneo');
+        if (btnEscaneo) {
+            btnEscaneo.style.display = 'inline-block';
+            btnEscaneo.addEventListener('click', function () {
+                initPeerJSReceiver();
+                this.textContent = 'MODO ESCANEO ACTIVO';
+                this.disabled = true;
+                if (typeof appendMissionLog === 'function') appendMissionLog('[ PC ] Modo escaneo activado — esperando unidades', false);
+            });
+        }
+    }
+
+    var btnSilenciar = document.getElementById('btn-silenciar-reconocer');
+    if (btnSilenciar) {
+        btnSilenciar.addEventListener('click', function () {
+            alarmSilenced = !alarmSilenced;
+            this.textContent = alarmSilenced ? 'RECONOCER (rearmar alertas)' : 'SILENCIAR / RECONOCER';
+            this.classList.toggle('active', alarmSilenced);
+        });
+    }
 
     /* ——— Lógica añadida: unidad móvil (baliza + pánico). Solo JS y detección isMobile(); no modifica HUD, mapa ni radar. ——— */
     var mobileBalizaWatchId = null;
@@ -4349,17 +4466,22 @@
         var topPanic = document.getElementById('top-bar-panic');
 
         function toggleBaliza() {
-            if (mobileBalizaWatchId != null) {
-                navigator.geolocation.clearWatch(mobileBalizaWatchId);
-                mobileBalizaWatchId = null;
+            var isOn = mobileBalizaWatchId != null || mobileStream || mobilePeer;
+            if (isOn) {
+                if (mobileBalizaWatchId != null) {
+                    navigator.geolocation.clearWatch(mobileBalizaWatchId);
+                    mobileBalizaWatchId = null;
+                }
                 if (mobileStream) {
                     mobileStream.getTracks().forEach(function (t) { t.stop(); });
                     mobileStream = null;
                 }
                 if (mobileCall) { try { mobileCall.close(); } catch (e) {} mobileCall = null; }
                 if (mobilePeer) { try { mobilePeer.destroy(); } catch (e) {} mobilePeer = null; }
-                if (fabBaliza) { fabBaliza.textContent = 'BALIZA'; fabBaliza.classList.remove('running'); }
+                if (fabBaliza) { fabBaliza.textContent = 'BALIZA DESACTIVADA'; fabBaliza.classList.remove('running'); }
                 if (topBaliza) topBaliza.textContent = 'BALIZA SENTINEL';
+                var nameBar = document.getElementById('mobile-name-bar');
+                if (nameBar) nameBar.classList.remove('hidden');
                 return;
             }
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -4393,11 +4515,13 @@
                         startGpsOnly();
                     }
                 }
-                if (fabBaliza) { fabBaliza.textContent = 'BALIZA ON'; fabBaliza.classList.add('running'); }
-                if (topBaliza) topBaliza.textContent = 'BALIZA ON';
+                if (fabBaliza) { fabBaliza.textContent = 'BALIZA ACTIVA'; fabBaliza.classList.add('running'); }
+                if (topBaliza) topBaliza.textContent = 'BALIZA ACTIVA';
+                var nameBar = document.getElementById('mobile-name-bar');
+                if (nameBar) nameBar.classList.add('hidden');
             }).catch(function (err) {
                 if (typeof appendMissionLog === 'function') appendMissionLog('Cámara denegada: ' + (err.message || 'permiso requerido'), true);
-                if (fabBaliza) fabBaliza.textContent = 'BALIZA';
+                if (fabBaliza) fabBaliza.textContent = 'BALIZA DESACTIVADA';
             });
             function startGpsOnly() {
                 mobileBalizaWatchId = navigator.geolocation.watchPosition(
