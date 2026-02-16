@@ -3,19 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SENTINEL V5.0 - CENTRAL MONITOR</title>
+    <title>SENTINEL V5.1 - PANIC MODE</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         :root { --neon-cyan: #00f2ff; --dark-bg: #050508; }
-        body { margin: 0; background: var(--dark-bg); color: var(--neon-cyan); font-family: 'monospace'; }
-        .monitor-frame { border: 1px solid #1e293b; position: relative; }
-        .scanline { width: 100%; height: 2px; background: rgba(0, 242, 255, 0.1); position: absolute; top: 0; animation: scan 4s linear infinite; }
+        body { margin: 0; background: var(--dark-bg); color: var(--neon-cyan); font-family: 'monospace'; overflow: hidden; }
+        .panic-alert { animation: panic-bg 0.5s infinite; }
+        @keyframes panic-bg { 0% { background: #000; } 50% { background: #450a0a; } 100% { background: #000; } }
+        .scanline { width: 100%; height: 2px; background: rgba(0, 242, 255, 0.1); position: absolute; top: 0; animation: scan 4s linear infinite; z-index: 10; pointer-events: none; }
         @keyframes scan { from { top: 0; } to { top: 100%; } }
     </style>
 </head>
-<body>
+<body id="main-body">
     <div id="root"></div>
 
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -32,61 +33,41 @@
         const WarRoom = () => {
             const [myId, setMyId] = useState('');
             const [units, setUnits] = useState([]);
-            const [isPC, setIsPC] = useState(false);
+            const [isPC] = useState(!/iPhone|Android|iPad/i.test(navigator.userAgent));
             const [isReady, setIsReady] = useState(false);
+            const [panicMode, setPanicMode] = useState(false);
             const myVideo = useRef(null);
             const remoteVideo = useRef(null);
             const peerInstance = useRef(null);
 
-            // FUNCIÓN PARA ARRANCAR TODO CON UN CLIC (Evita bloqueo de navegador)
-            const initializeSystem = async () => {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { facingMode: isPC ? "user" : "environment" }, 
-                        audio: false 
-                    });
-                    if (myVideo.current) myVideo.current.srcObject = stream;
-                    setIsReady(true);
-                } catch (e) {
-                    alert("Por favor, permite el acceso a la cámara.");
-                }
-            };
-
             useEffect(() => {
-                const device = !/iPhone|Android|iPad/i.test(navigator.userAgent);
-                setIsPC(device);
-
-                const peer = new Peer({
-                    config: {'iceServers': [
-                        { url: 'stun:stun.l.google.com:19302' },
-                        { url: 'stun:stun1.l.google.com:19302' }
-                    ]}
-                });
-
-                peer.on('open', async (id) => {
-                    setMyId(id);
-                    await supabaseClient.from('sentinel_units').upsert({ 
-                        unit_name: device ? "CENTRAL_WAR_ROOM" : `MOVIL_${id.substring(0,4)}`, 
-                        peer_id: id,
-                        is_online: true 
+                const init = async () => {
+                    const peer = new Peer({ config: {'iceServers': [{ url: 'stun:stun.l.google.com:19302' }]} });
+                    peer.on('open', async (id) => {
+                        setMyId(id);
+                        await supabaseClient.from('sentinel_units').upsert({ 
+                            unit_name: isPC ? "CENTRAL_WAR_ROOM" : `UNIDAD_${id.substring(0,4)}`, 
+                            peer_id: id, is_online: true 
+                        });
                     });
-                });
-
-                peer.on('call', call => {
-                    // Responder con nuestro stream (aunque sea vacío para que WebRTC no falle)
-                    call.answer(myVideo.current?.srcObject); 
-                    call.on('stream', remoteStream => {
-                        if (remoteVideo.current) {
-                            remoteVideo.current.srcObject = remoteStream;
-                            remoteVideo.current.play().catch(console.error);
-                        }
+                    peer.on('call', call => {
+                        call.answer(myVideo.current?.srcObject);
+                        call.on('stream', s => { if(remoteVideo.current) remoteVideo.current.srcObject = s; });
                     });
-                });
-
-                peerInstance.current = peer;
+                    peerInstance.current = peer;
+                };
+                init();
+                
+                // Suscribirse a alertas en tiempo real
+                const channel = supabaseClient
+                    .channel('alerts')
+                    .on('postgres_changes', { event: 'INSERT', table: 'sentinel_alerts' }, payload => {
+                        if (isPC) triggerPanic();
+                    })
+                    .subscribe();
 
                 const interval = setInterval(fetchUnits, 3000);
-                return () => clearInterval(interval);
+                return () => { clearInterval(interval); supabaseClient.removeChannel(channel); };
             }, [isPC]);
 
             const fetchUnits = async () => {
@@ -94,76 +75,57 @@
                 setUnits(data || []);
             };
 
-            const connectTo = (remoteId) => {
-                if (!isReady) {
-                    alert("Primero haz clic en 'INICIALIZAR' para activar el visor.");
-                    return;
-                }
-                // La central llama pidiendo el video
-                const call = peerInstance.current.call(remoteId, myVideo.current.srcObject);
-                call.on('stream', stream => {
-                    if (remoteVideo.current) {
-                        remoteVideo.current.srcObject = stream;
-                        remoteVideo.current.play().catch(console.error);
-                    }
-                });
+            const triggerPanic = () => {
+                setPanicMode(true);
+                const audio = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3'); // Sonido provisional
+                audio.play();
+                setTimeout(() => setPanicMode(false), 5000); // La alerta visual dura 5 segundos
+            };
+
+            const sendAlert = async () => {
+                await supabaseClient.from('sentinel_alerts').insert([{ unit_id: myId, type: 'CRITICAL' }]);
+                alert("ALERTA ENVIADA A CENTRAL");
+            };
+
+            const initialize = async () => {
+                const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                if (myVideo.current) myVideo.current.srcObject = s;
+                setIsReady(true);
             };
 
             return (
-                <div className="p-4 bg-black min-h-screen text-cyan-400 font-mono">
-                    <div className="flex justify-between border-b border-cyan-900 mb-6 pb-2 items-center">
-                        <h1 className="text-xl font-bold tracking-widest text-white italic">SENTINEL <span className="text-cyan-500 font-light">V5.0</span></h1>
-                        {!isReady && (
-                            <button onClick={initializeSystem} className="bg-red-600 text-white text-[10px] px-4 py-1 animate-pulse font-bold border border-white">
-                                ⚠️ INICIALIZAR SISTEMA
-                            </button>
-                        )}
-                        <div className="text-right">
-                            <span className="block text-[10px] text-green-500">SISTEMA EN LINEA</span>
-                            <span className="text-[8px] text-gray-500">ID: {myId.substring(0,6)}</span>
+                <div className={`p-4 min-h-screen ${panicMode ? 'panic-alert' : 'bg-black'} transition-colors duration-300`}>
+                    <div className="scanline"></div>
+                    
+                    <div className="flex justify-between items-center border-b border-cyan-900 mb-4 pb-2">
+                        <h1 className="text-xl font-bold tracking-tighter">SENTINEL <span className={panicMode ? 'text-red-500' : 'text-cyan-500'}>V5.1</span></h1>
+                        <div className="flex gap-2">
+                            {!isReady && <button onClick={initialize} className="bg-cyan-600 text-black px-3 py-1 text-[10px] font-bold">INICIALIZAR</button>}
+                            {!isPC && isReady && <button onClick={sendAlert} className="bg-red-600 text-white px-3 py-1 text-[10px] font-bold border border-white pulse-red">PÁNICO</button>}
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        {/* LISTA DE UNIDADES */}
-                        <div className="lg:col-span-3 space-y-4">
-                            <div className="border border-cyan-900 p-3 bg-cyan-950/10 shadow-[0_0_15px_rgba(0,242,255,0.05)]">
-                                <p className="text-[10px] font-bold text-white mb-4 uppercase underline">Unidades Detectadas</p>
-                                <div className="space-y-2">
-                                    {units.filter(u => u.peer_id !== myId).length === 0 && <p className="text-[9px] text-gray-600">Buscando señales...</p>}
-                                    {units.filter(u => u.peer_id !== myId).map(u => (
-                                        <button key={u.id} onClick={() => connectTo(u.peer_id)} className="w-full text-left border border-cyan-500/30 p-2 text-[10px] hover:bg-cyan-500 hover:text-black transition-all flex justify-between items-center group">
-                                            <span>📡 {u.unit_name}</span>
-                                            <span className="text-[8px] group-hover:font-bold">CONECTAR</span>
-                                        </button>
-                                    ))}
-                                </div>
+                    <div className="grid grid-cols-12 gap-4">
+                        {isPC && (
+                            <div className="col-span-3 border border-cyan-900 p-2 bg-black/50">
+                                <p className="text-[9px] text-white underline mb-2 tracking-widest">RED OPERATIVA</p>
+                                {units.filter(u => u.peer_id !== myId).map(u => (
+                                    <button key={u.id} onClick={() => peerInstance.current.call(u.peer_id, myVideo.current.srcObject).on('stream', s => remoteVideo.current.srcObject = s)} 
+                                        className="w-full text-left border border-cyan-800 p-2 mb-2 text-[10px] hover:bg-cyan-500 hover:text-black">
+                                        🛰️ {u.unit_name}
+                                    </button>
+                                ))}
                             </div>
+                        )}
+
+                        <div className={`${isPC ? 'col-span-6' : 'col-span-12'} border ${panicMode ? 'border-red-500' : 'border-cyan-900'} bg-black relative`}>
+                            {panicMode && <div className="absolute inset-0 z-20 flex items-center justify-center bg-red-900/20"><h2 className="text-red-500 text-2xl font-black animate-ping text-center">!!! ALERTA CRÍTICA !!!</h2></div>}
+                            <video ref={remoteVideo} autoPlay playsInline className="w-full aspect-video object-cover" />
                         </div>
 
-                        {/* VISOR PRINCIPAL */}
-                        <div className={`${isPC ? 'lg:col-span-6' : 'lg:col-span-12'} monitor-frame bg-gray-950 min-h-[300px] shadow-[0_0_30px_rgba(255,0,0,0.05)]`}>
-                            <div className="scanline"></div>
-                            <video ref={remoteVideo} autoPlay playsInline className="w-full aspect-video object-cover bg-black" />
-                            {!isPC && (
-                                <div className="absolute inset-0 flex items-center justify-center text-[10px] text-cyan-800 text-center p-10 bg-black/60 pointer-events-none">
-                                    MODO EMISOR ACTIVO<br/>TRANSMITIENDO HACIA CENTRAL...
-                                </div>
-                            )}
-                            <div className="absolute bottom-0 left-0 w-full bg-black/80 p-1 text-[8px] flex justify-between px-2 border-t border-cyan-900/50">
-                                <span>{isPC ? "RECEPTOR_CENTRAL" : "UNIDAD_MOVIL_STREAMING"}</span>
-                                <span className="text-red-500 font-bold animate-pulse">● LIVE FEED</span>
-                            </div>
-                        </div>
-
-                        {/* TU CÁMARA (Monitor de referencia) */}
-                        <div className="lg:col-span-3">
-                            <div className="border border-cyan-900 p-1 bg-black shadow-lg">
-                                <video ref={myVideo} autoPlay playsInline muted className="w-full aspect-video grayscale contrast-125 border border-cyan-900/50" />
-                                <p className="text-[9px] mt-1 text-center text-cyan-600 uppercase italic">
-                                    {isPC ? "Monitor Operador" : "Vista de Cámara"}
-                                </p>
-                            </div>
+                        <div className={`${isPC ? 'col-span-3' : 'col-span-12'} border border-cyan-900 p-2 bg-black`}>
+                            <video ref={myVideo} autoPlay playsInline muted className="w-full aspect-video grayscale contrast-150 border border-cyan-900/30" />
+                            <p className="text-[9px] text-center mt-2">MONITOR_LOCAL</p>
                         </div>
                     </div>
                 </div>
