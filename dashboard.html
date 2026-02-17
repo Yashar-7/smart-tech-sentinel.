@@ -139,42 +139,61 @@
         @media (max-width: 768px) {
             .panels-overlay { display: block; }
         }
-        /* Control center móvil: arquitectura cerrada — flex, sin absolute en botones; visible solo en @media */
+        /* Control center móvil: flex-column, PÁNICO arriba, BALIZA abajo, 20px entre ellos; sin absolute en botones */
         .control-center {
             display: none;
             flex-direction: column;
-            gap: 20px;
-            padding: 20px;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0;
+            padding: 16px 20px 24px;
             position: fixed;
-            bottom: 10%;
+            bottom: 0;
+            left: 0;
+            right: 0;
             width: 100%;
             z-index: 10000;
-            align-items: center;
             box-sizing: border-box;
+            pointer-events: none;
         }
+        .control-center > * { pointer-events: auto; }
+        /* Input de nombre: una línea discreta arriba de los botones */
         .control-center .mobile-name-bar {
             width: 100%;
-            max-width: 320px;
+            max-width: 200px;
+            margin-bottom: 12px;
             position: relative;
-            bottom: auto;
-            left: auto;
-            right: auto;
             display: flex;
             flex-direction: row;
             align-items: center;
-            gap: 8px;
-            background: rgba(10, 10, 20, 0.92);
-            border: 1px solid rgba(0, 242, 255, 0.35);
-            border-radius: 8px;
-            padding: 6px 10px;
-            box-shadow: 0 0 12px rgba(0, 242, 255, 0.1);
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 242, 255, 0.25);
+            border-radius: 4px;
+            padding: 4px 8px;
+            box-shadow: none;
         }
         .control-center .mobile-name-bar.hidden { display: none !important; }
+        .control-center .mobile-name-label {
+            font-size: 0.55rem;
+            flex-shrink: 0;
+        }
+        .control-center .mobile-name-input {
+            flex: 1;
+            min-width: 0;
+            padding: 4px 6px;
+            font-size: 0.7rem;
+        }
+        /* PÁNICO arriba, margen 20px hacia abajo */
+        .control-center .fab-panic {
+            margin-bottom: 20px;
+        }
         .fab-baliza {
             display: none;
             width: 64px;
             height: 64px;
             border-radius: 50%;
+            position: relative;
             background: rgba(0, 242, 255, 0.2);
             border: 2px solid var(--neon-cyan);
             color: var(--neon-cyan);
@@ -240,6 +259,7 @@
             background: transparent;
             border: none;
             padding: 0;
+            margin: 0;
         }
         .fab-panic:hover { background: transparent; }
         .btn-panic { color: var(--alert-red); border-color: var(--alert-red); }
@@ -269,9 +289,13 @@
         .mobile-name-input::placeholder { color: rgba(0, 242, 255, 0.5); }
         .mobile-name-input:focus { outline: none; border-color: var(--neon-cyan); }
         @media (max-width: 768px) {
-            .control-center { display: flex !important; }
-            .fab-baliza { display: flex !important; }
-            .fab-panic { display: flex !important; align-items: center; justify-content: center; }
+            .control-center {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+            }
+            .fab-baliza { display: flex !important; position: relative !important; }
+            .fab-panic { display: flex !important; align-items: center; justify-content: center; position: relative !important; }
             .top-bar-baliza { display: none !important; }
             .top-bar { display: none; }
             .is-mobile .top-bar .top-bar-baliza,
@@ -501,17 +525,30 @@
             .map-grid-overlay { background-size: 24px 24px; }
             body::after { display: none !important; }
         }
-        /* Deformación esférica leve — pantalla curva */
+        /* Mapa de fondo: ocupa todo el espacio */
         .main-wrap {
-            display: flex; flex: 1; min-height: 0; position: relative;
-            transform: perspective(1400px) rotateX(0.6deg);
-            transform-style: preserve-3d;
-            border-radius: 8px;
+            position: relative;
+            flex: 1;
+            min-height: 0;
             overflow: hidden;
+            border-radius: 8px;
             box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.15);
         }
+        .map-sentinel-wrap {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1;
+        }
         #map {
-            flex: 1; min-height: 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
             filter: invert(100%) hue-rotate(180deg) brightness(0.6) contrast(1.2);
         }
 
@@ -710,14 +747,21 @@
             background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
         }
         .sidebar-cameras { position: relative; }
+        /* Grilla de cámaras: derecha, z-index 10, 2 columnas para ver todos a la vez */
+        #camera-grid,
         .camera-grid-container {
             display: grid;
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, 1fr);
             gap: 10px;
             width: 100%;
             min-height: 80px;
             max-height: 320px;
             overflow-y: auto;
+            z-index: 10;
+        }
+        #camera-grid .video-feed-box {
+            aspect-ratio: 16/9;
+            min-height: 0;
         }
         .camera-grid-container .video-box-unit {
             position: relative;
@@ -749,6 +793,27 @@
             position: absolute; top: 6px; right: 8px; z-index: 3;
             font-size: 0.55rem; font-weight: 700; letter-spacing: 1px;
             color: var(--fluor-green); text-shadow: 0 0 6px var(--fluor-green-glow);
+        }
+        .video-feed-box { position: relative; overflow: hidden; background: #0a0a0a; }
+        .video-feed-box.p-1 { padding: 4px; }
+        .video-feed-box.border-neon-blue { border: 2px solid rgba(0, 242, 255, 0.4); }
+        .video-feed-box video { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .video-feed-box .unit-label {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            font-size: 10px; padding: 4px 6px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--neon-cyan);
+        }
+        /* Ojo de Dios: parpadeo rojo neón en el cuadro de video cuando entra llamada de PÁNICO */
+        .video-feed-box.panic-alert {
+            border-color: var(--alert-red);
+            box-shadow: 0 0 20px rgba(255, 0, 64, 0.8), inset 0 0 15px rgba(255, 0, 64, 0.15);
+            animation: panic-box-blink 0.6s ease-in-out infinite;
+        }
+        @keyframes panic-box-blink {
+            0%, 100% { border-color: var(--alert-red); box-shadow: 0 0 20px rgba(255, 0, 64, 0.8), inset 0 0 15px rgba(255, 0, 64, 0.15); }
+            50% { border-color: #ff4466; box-shadow: 0 0 35px rgba(255, 0, 64, 1), inset 0 0 25px rgba(255, 0, 64, 0.25); }
         }
         @keyframes cam-glitch-flicker {
             0%, 70% { opacity: 1; }
@@ -1612,18 +1677,50 @@
 
         /* Pestaña del drawer de telemetría: solo visible en móvil */
         .telemetry-drawer-tab { display: none; }
-        /* En desktop: ocultar bloque central (telemetría); mapa se expande hasta el panel de cámaras */
-        #telemetry-drawer { display: none !important; }
-        /* Drawer ESTADO: en desktop no es drawer, solo contenedor en flujo */
-        #estado-drawer { position: relative; bottom: auto; }
+        /* En desktop: paneles flotantes semi-transparentes; sin bloque central */
+        #telemetry-drawer {
+            display: block !important;
+            position: fixed;
+            bottom: 60px;
+            left: 12px;
+            width: 260px;
+            max-height: 200px;
+            z-index: 1002;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        #telemetry-drawer .telemetry-drawer-tab { display: flex !important; }
+        #telemetry-drawer .telemetry-drawer-inner { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+        #telemetry-drawer.open .telemetry-drawer-inner { max-height: 160px; overflow-y: auto; }
+        #estado-drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 320px; max-width: 90vw; }
         .estado-drawer-tab { display: none; }
-        .estado-drawer-inner { max-height: none; overflow: visible; }
-        /* Drawer de paneles: solo sidebar (cámaras); mapa ocupa todo el espacio hasta la sidebar */
+        .estado-drawer-inner { max-height: none; overflow: visible; height: 100%; }
+        /* Paneles flotantes: sidebar derecha semi-transparente, sin bloquear el mapa */
         .panels-drawer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 320px;
+            max-width: 90vw;
+            z-index: 10;
             display: flex;
             flex-direction: row;
-            z-index: 1002;
-            flex-shrink: 0;
+            pointer-events: none;
+        }
+        .panels-drawer > * { pointer-events: auto; }
+        .panels-drawer .sidebar {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-left: 1px solid rgba(0, 255, 255, 0.3);
+            width: 100%;
+            max-height: 100%;
+            overflow-y: auto;
         }
         /* Panel flotante de unidades: solo visible cuando hay unidad conectada (JS lo muestra) */
         .unit-health-wrap {
@@ -2013,16 +2110,11 @@
             pointer-events: none;
         }
 
-        /* --- Sentinel HUD: overlay fijo absoluto sobre el mapa --- */
+        /* --- Sentinel HUD: overlay sobre el mapa (mapa ya es absolute full) --- */
         .map-sentinel-wrap {
-            position: relative;
-            flex: 1;
-            min-height: 0;
-            display: flex;
-        }
-        .map-sentinel-wrap #map {
-            flex: 1;
-            min-height: 0;
+            position: absolute;
+            inset: 0;
+            z-index: 1;
         }
         /* The Grid: cuadrícula ultra fina sobre el mapa */
         .map-grid-overlay {
@@ -2573,8 +2665,8 @@
 <!-- Móvil: campo nombre/unidad arriba de los botones; se oculta al activar baliza -->
 <div class="control-center" id="control-center">
     <div class="mobile-name-bar" id="mobile-name-bar">
-        <label for="mobile-unit-name" class="mobile-name-label">Tu Nombre o Unidad</label>
-        <input type="text" id="mobile-unit-name" class="mobile-name-input" placeholder="Ej: Patrulla 01" maxlength="30" autocomplete="off" />
+        <label for="mobile-unit-name" class="mobile-name-label">Nombre</label>
+        <input type="text" id="mobile-unit-name" class="mobile-name-input" placeholder="Patrulla 01" maxlength="30" autocomplete="off" />
     </div>
     <button type="button" class="btn-panic-circle fab-panic" id="fab-panic" aria-label="Enviar señal de pánico">
         <svg class="panic-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
@@ -2676,7 +2768,7 @@
         <div class="sidebar-cameras">
             <div class="sidebar-title">[SNTNL_CAM_MULTI]</div>
             <video id="remoteVideo" autoplay playsinline muted></video>
-            <div class="camera-grid-container" id="camera-grid-container"></div>
+            <div class="camera-grid-container" id="camera-grid"></div>
             <!-- CAM 02: video directo cámara tráfico MDQ o fallback imagen estática -->
             <div class="camera-scan-wrap cam-02-wrap" id="cam-02-wrap">
                 <video id="cam-02-video" autoplay playsinline title="CAM 02 MDQ"></video>
@@ -3169,51 +3261,67 @@
         }, 5000);
     })();
 
-    /* PeerJS: arquitectura cerrada — receptor fijo WAR_ROOM_CENTRAL; stream principal en remoteVideo (muted obligatorio para autoplay). */
+    /* PeerJS: lógica definitiva — ID único WAR_ROOM_CENTRAL, STUN para conexión estable, contenedor dinámico por peer (las cámaras no se pisan). */
     function initPeerJSReceiver() {
         if (typeof Peer === 'undefined') return;
-        var videoGrid = document.getElementById('camera-grid-container');
+        var cameraGrid = document.getElementById('camera-grid');
         var remoteVideoEl = document.getElementById('remoteVideo');
-        if (!videoGrid) return;
+        if (!cameraGrid) return;
         try {
-            const peer = new Peer('WAR_ROOM_CENTRAL');
+            const peer = new Peer('WAR_ROOM_CENTRAL', {
+                config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+            });
             peer.on('open', function () {
-                if (typeof appendMissionLog === 'function') appendMissionLog('[ PEERJS ] WAR_ROOM_CENTRAL — receptor listo', false);
+                if (typeof appendMissionLog === 'function') appendMissionLog('[ PEERJS ] WAR_ROOM_CENTRAL — receptor listo (STUN)', false);
             });
             peer.on('call', function (call) {
-                var unitId = call.peer;
                 call.answer();
+                var peerId = call.peer;
+                var safeId = (peerId + '').replace(/[^a-zA-Z0-9_-]/g, '_');
+                /* Cierre limpio: si la persona cierra la app en el celular, el cuadrito de video desaparece automáticamente */
+                call.on('close', function () {
+                    var box = document.getElementById('container-' + safeId);
+                    if (box) box.remove();
+                    var remaining = cameraGrid.querySelectorAll('.video-feed-box video');
+                    var otherStream = null;
+                    for (var i = 0; i < remaining.length; i++) {
+                        if (remaining[i].srcObject) { otherStream = remaining[i].srcObject; break; }
+                    }
+                    if (remoteVideoEl) remoteVideoEl.srcObject = otherStream;
+                });
                 call.on('stream', function (remoteStream) {
-                    if (remoteVideoEl) {
+                    var videoContainer = document.getElementById('container-' + safeId);
+                    if (!videoContainer) {
+                        videoContainer = document.createElement('div');
+                        videoContainer.id = 'container-' + safeId;
+                        videoContainer.className = 'video-feed-box border-neon-blue p-1 relative';
+                        videoContainer.setAttribute('data-peer-id', peerId);
+                        var safeLabel = (peerId + '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                        videoContainer.innerHTML = '<video id="video-' + safeId + '" autoplay playsinline muted class="w-full h-full object-cover"></video>' +
+                            '<div class="unit-label absolute bottom-0 bg-black/70 text-[10px] p-1">' + safeLabel + '</div>';
+                        cameraGrid.appendChild(videoContainer);
+                    }
+                    var videoElement = document.getElementById('video-' + safeId);
+                    if (!videoElement) videoElement = videoContainer.querySelector('video');
+                    if (videoElement) {
+                        videoElement.srcObject = remoteStream;
+                        videoElement.play().catch(function () {});
+                    }
+                    if (remoteVideoEl && !remoteVideoEl.srcObject) {
                         remoteVideoEl.srcObject = remoteStream;
                         remoteVideoEl.play().catch(function () {});
                     }
-                    var videoBox = document.getElementById('video-box-' + unitId);
-                    if (!videoBox) {
-                        videoBox = document.createElement('div');
-                        videoBox.id = 'video-box-' + unitId;
-                        videoBox.className = 'video-box-unit';
-                        videoBox.innerHTML = '<video id="video-' + unitId.replace(/"/g, '&quot;') + '" autoplay playsinline muted title="' + unitId + '"></video>' +
-                            '<span class="video-box-label">LIVE: ' + unitId.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>' +
-                            '<span class="video-box-rec">REC</span>';
-                        videoGrid.appendChild(videoBox);
-                    }
-                    var videoEl = document.getElementById('video-' + unitId);
-                    if (videoEl) {
-                        videoEl.srcObject = remoteStream;
-                        videoEl.play().catch(function () {});
-                    }
-                    function removeBoxWhenStreamEnded() {
+                    function removeContainerWhenStreamEnded() {
                         var tracks = remoteStream.getTracks();
                         var allEnded = tracks.length === 0 || tracks.every(function (t) { return t.readyState === 'ended'; });
                         if (allEnded) {
-                            var box = document.getElementById('video-box-' + unitId);
+                            var box = document.getElementById('container-' + safeId);
                             if (box) box.remove();
                             if (remoteVideoEl && remoteVideoEl.srcObject === remoteStream) remoteVideoEl.srcObject = null;
                         }
                     }
                     remoteStream.getTracks().forEach(function (track) {
-                        track.onended = removeBoxWhenStreamEnded;
+                        track.onended = removeContainerWhenStreamEnded;
                     });
                 });
             });
@@ -3982,9 +4090,9 @@
         if (balizaContent) balizaContent.classList.remove('cam-02-panic-with-video');
         if (panicVideoWrap) panicVideoWrap.innerHTML = '';
         balizaPanicVideoRestoreParent = null;
-        var grid = document.getElementById('camera-grid-container');
+        var grid = document.getElementById('camera-grid');
         if (grid) {
-            var videoBox = document.getElementById('video-box-UNIDAD_MOBILE') || grid.querySelector('.video-box-unit');
+            var videoBox = document.getElementById('container-UNIDAD_MOBILE') || grid.querySelector('.video-feed-box');
             var videoEl = videoBox ? videoBox.querySelector('video') : null;
             if (videoEl && videoEl.srcObject && panicVideoWrap) {
                 balizaPanicVideoRestoreParent = videoEl.parentNode;
@@ -4020,9 +4128,21 @@
     }
 
     function onPanicReceived(lat, lng) {
+        /* Auto-Zoom: volar el mapa a la ubicación GPS de la persona en pánico */
         if (typeof map !== 'undefined') map.flyTo([lat, lng], 18, { animate: true, duration: 2 });
         showBalizaLive(lat, lng);
         if (typeof appendMissionLog === 'function') appendMissionLog('ALERT: PÁNICO RECIBIDO — BALIZA EN VIVO', true);
+        /* Alerta visual: parpadear en rojo neón el cuadro de video de esa persona */
+        var safeMobileId = ('UNIDAD_MOBILE').replace(/[^a-zA-Z0-9_-]/g, '_');
+        var panicBox = document.getElementById('container-' + safeMobileId);
+        if (!panicBox) {
+            var grid = document.getElementById('camera-grid');
+            if (grid) panicBox = grid.querySelector('.video-feed-box');
+        }
+        if (panicBox) {
+            panicBox.classList.add('panic-alert');
+            setTimeout(function () { if (panicBox && panicBox.parentNode) panicBox.classList.remove('panic-alert'); }, 15000);
+        }
     }
 
     function syncLocationToMap(row) {
@@ -4587,8 +4707,6 @@
             event_time: new Date().toISOString()
         }).then(function () {});
         if (typeof appendMissionLog === 'function') appendMissionLog('PÁNICO ENVIADO — WAR ROOM ALERTADO', true);
-        var fab = document.getElementById('fab-panic');
-        if (fab) { fab.classList.add('sent'); setTimeout(function () { fab.classList.remove('sent'); }, 3000); }
     }
 
     function setupMobileBaliza() {
@@ -4725,20 +4843,28 @@
                 appendMissionLog('La cámara requiere conexión segura (HTTPS) para funcionar', true);
                 return;
             }
-            if (!navigator.geolocation) {
-                if (typeof appendMissionLog === 'function') appendMissionLog('GPS no disponible para pánico', true);
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                if (typeof appendMissionLog === 'function') appendMissionLog('Cámara no disponible', true);
                 return;
             }
-            navigator.geolocation.getCurrentPosition(
-                function (pos) {
-                    mobileSendPanic(pos);
-                    startMobileCameraToWarRoom();
-                },
-                function (err) {
-                    if (typeof appendMissionLog === 'function') appendMissionLog('ERROR GPS: ' + (err.message || 'denegado'), true);
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-            );
+            /* Al tocar PÁNICO: pedir permiso de cámara e inmediatamente llamar a WAR_ROOM_CENTRAL */
+            navigator.mediaDevices.getUserMedia({ video: true, audio: false }).then(function (stream) {
+                mobileStream = stream;
+                startMobileCameraToWarRoomWithRetry(stream);
+            }).catch(function (err) {
+                if (typeof appendMissionLog === 'function') appendMissionLog('Cámara denegada: ' + (err.message || 'permiso requerido'), true);
+            });
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function (pos) { mobileSendPanic(pos); },
+                    function (err) {
+                        if (typeof appendMissionLog === 'function') appendMissionLog('GPS: ' + (err.message || 'denegado'), true);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            }
+            var fab = document.getElementById('fab-panic');
+            if (fab) { fab.classList.add('sent'); setTimeout(function () { fab.classList.remove('sent'); }, 3000); }
         }
 
         if (fabBaliza) fabBaliza.addEventListener('click', toggleBaliza);
