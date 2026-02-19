@@ -586,6 +586,131 @@
             filter: invert(100%) hue-rotate(180deg) brightness(0.6) contrast(1.2);
         }
 
+        /* --- Panel de Cámaras Flotante (HUD táctico sobre el mapa - Mar del Plata Viva) --- */
+        .floating-camera-panel {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            width: 450px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            pointer-events: none;
+        }
+        .floating-camera-header {
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 2px solid #00f2ff;
+            padding: 8px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            pointer-events: auto;
+        }
+        .floating-camera-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: #00f2ff;
+            letter-spacing: 0.3em;
+            font-family: 'Orbitron', 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            text-align: center;
+            margin: 0;
+        }
+        .floating-camera-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            overflow-y: auto;
+            padding-right: 8px;
+            pointer-events: auto;
+            min-height: 0;
+        }
+        .floating-camera-grid .floating-camera-cell,
+        .floating-camera-grid .video-feed-box {
+            position: relative;
+            border: 1px solid rgba(0, 242, 255, 0.3);
+            background: rgba(0, 0, 0, 0.9);
+            border-radius: 2px;
+            overflow: hidden;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.8);
+            aspect-ratio: 16/9;
+            display: none;
+        }
+        .floating-camera-grid .video-feed-box.has-stream,
+        .floating-camera-grid .floating-camera-cell.has-stream {
+            display: block;
+        }
+        .floating-camera-grid .floating-camera-cell video,
+        .floating-camera-grid .video-feed-box video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        /* HUD táctico compacto (no obstruye el video) */
+        .floating-camera-cell .floating-hud {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 6px;
+            pointer-events: none;
+        }
+        .floating-camera-cell .floating-hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .floating-camera-cell .floating-hud-unit {
+            background: rgba(0, 0, 0, 0.7);
+            color: #ff003c;
+            font-size: 8px;
+            font-weight: bold;
+            padding: 2px 4px;
+            border-left: 1px solid #ff003c;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .floating-camera-cell .floating-hud-live {
+            font-size: 7px;
+            color: #00f2ff;
+            opacity: 0.7;
+        }
+        .floating-camera-cell .floating-hud-bottom {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            border-top: 1px solid rgba(0, 242, 255, 0.2);
+            margin-top: auto;
+        }
+        .floating-camera-cell .floating-hud-coords {
+            font-size: 7px;
+            color: rgba(255, 255, 255, 0.9);
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1.3;
+            padding: 2px 4px;
+        }
+
+        /* Estilo para el scrollbar del War Room (panel de cámaras y zonas con scroll) */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #00f2ff; border-radius: 10px; }
+        .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #00f2ff rgba(0, 0, 0, 0.3); }
+
+        /* Efecto de parpadeo para unidades en alerta (anillo que se expande) */
+        .alert-pulse { animation: alert-pulse-ring 1.5s infinite; }
+        @keyframes alert-pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 60, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 0, 60, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 60, 0); }
+        }
+        /* En el War Room: anillo visible sobre el borde de la cámara cuando está en alerta/pánico */
+        .floating-camera-cell.alert-pulse,
+        .floating-camera-grid .video-feed-box.alert-pulse {
+            border-color: rgba(255, 0, 60, 0.9);
+            box-shadow: 0 0 12px rgba(255, 0, 60, 0.5);
+        }
+
         /* --- Paneles tácticos: glassmorphism + esquinas 45° + grain sutil --- */
         .panel-glass {
             background: rgba(0, 20, 30, 0.4);
@@ -2839,6 +2964,13 @@
         </div>
         <div class="sentinel-hud-text">SCANNING MDQ_SECTOR_01... STATUS: ACTIVE</div>
     </div>
+    <!-- HUD de Cámaras Tácticas flotante sobre el mapa (Estilo Mar del Plata Viva) -->
+    <div class="floating-camera-panel" id="floating-camera-panel" aria-label="Feed de video en tiempo real">
+        <div class="floating-camera-header">
+            <h2 class="floating-camera-title">Sentinel Video Feed — Active</h2>
+        </div>
+        <div class="floating-camera-grid custom-scrollbar" id="camera-grid"></div>
+    </div>
     <div class="panels-drawer">
     <div id="telemetry-drawer" class="telemetry-drawer">
         <button type="button" class="telemetry-drawer-tab" id="telemetry-drawer-tab" aria-expanded="false" aria-controls="telemetry-drawer-inner">
@@ -2862,16 +2994,7 @@
         <button type="button" class="estado-drawer-tab" id="estado-drawer-tab" aria-expanded="false" aria-controls="estado-drawer-inner">ESTADO</button>
         <div id="estado-drawer-inner" class="estado-drawer-inner" role="region" aria-label="Estado del sistema y cámaras">
     <aside class="sidebar" id="dashboard-sidebar">
-        <!-- Multicámara real-time: contenedor flexible que recibe una caja por unidad (PeerJS) -->
-        <!-- Mosaico Táctico: SENTINEL VIDEO FEED -->
-        <div class="sidebar-cameras tactical-grid-wrap mosaic-tactical-wrap">
-            <div class="tactical-grid-header mosaic-header">
-                <h2 class="tactical-grid-title">SENTINEL VIDEO FEED — ACTIVE</h2>
-                <span class="status-ping" aria-hidden="true"></span>
-            </div>
-            <video id="remoteVideo" autoplay playsinline muted></video>
-            <div class="tactical-grid camera-grid-container mosaic-grid" id="camera-grid"></div>
-        </div>
+        <video id="remoteVideo" autoplay playsinline muted style="display:none;"></video>
         <div class="system-health-panel system-health-compact">
             <div class="panel-title">[SYS_HEALTH]</div>
             <div class="health-compact">
@@ -3358,20 +3481,19 @@
                     if (!videoContainer) {
                         videoContainer = document.createElement('div');
                         videoContainer.id = 'container-' + safeId;
-                        videoContainer.className = 'tactical-camera-cell video-feed-box group';
+                        videoContainer.className = 'floating-camera-cell video-feed-box';
                         videoContainer.setAttribute('data-peer-id', peerId);
                         var safeLabel = (peerId + '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-                        var unitId = safeLabel || 'ALPHA_01';
+                        var unitName = safeLabel || 'ALPHA_01';
                         videoContainer.innerHTML =
-                            '<video id="video-' + safeId + '" autoplay playsinline muted class="mosaic-video"></video>' +
-                            '<div class="tactical-hud">' +
-                            '<div class="tactical-hud-top">' +
-                            '<div class="tactical-hud-unit"><p class="hud-id">UNIT_ID: ' + unitId + '</p></div>' +
-                            '<div class="tactical-hud-enc">STRM_ENC: AES-256</div>' +
+                            '<video id="video-' + safeId + '" autoplay playsinline muted></video>' +
+                            '<div class="floating-hud">' +
+                            '<div class="floating-hud-top">' +
+                            '<span class="floating-hud-unit">' + unitName + '</span>' +
+                            '<span class="floating-hud-live">LIVE</span>' +
                             '</div>' +
-                            '<div class="tactical-hud-bottom">' +
-                            '<span class="hud-coord">Coord: <span class="hud-coord-value">Scanning...</span></span>' +
-                            '<span class="hud-livesync">LIVE SYNC</span>' +
+                            '<div class="floating-hud-bottom">' +
+                            '<p class="floating-hud-coords">LAT: <span class="hud-lat-value">—</span><br>LNG: <span class="hud-lng-value">—</span></p>' +
                             '</div>' +
                             '</div>';
                         cameraGrid.appendChild(videoContainer);
@@ -3792,6 +3914,7 @@
                 onPanicReceived(lat, lng);
             else if (id === 'UNIDAD_MOBILE' && typeof balizaLiveActive !== 'undefined' && balizaLiveActive)
                 showBalizaLive(lat, lng);
+            setCameraContainerAlert(id, status === 'alert' || status === 'panic');
             return;
         }
         ensureUnidadLiveMarker(id, row);
@@ -3799,8 +3922,10 @@
         updateFirstLiveUnitUI();
         if (id === 'UNIDAD_MOBILE' && (row.status || '').toLowerCase() === 'panic' && row.lat != null && row.lng != null)
             onPanicReceived(row.lat, row.lng);
+        setCameraContainerAlert(id, status === 'alert' || status === 'panic');
     }
     function removeUnidadLiveFromMap(id) {
+        setCameraContainerAlert(id, false);
         var m = unidadesLiveMarkersById[id];
         if (m) {
             map.removeLayer(m);
@@ -4145,8 +4270,29 @@
             if (grid) panicBox = grid.querySelector('.video-feed-box');
         }
         if (panicBox) {
-            panicBox.classList.add('panic-alert');
-            setTimeout(function () { if (panicBox && panicBox.parentNode) panicBox.classList.remove('panic-alert'); }, 15000);
+            panicBox.classList.add('panic-alert', 'alert-pulse');
+            setTimeout(function () {
+                if (panicBox && panicBox.parentNode) {
+                    panicBox.classList.remove('panic-alert', 'alert-pulse');
+                }
+            }, 15000);
+        }
+    }
+
+    function setCameraContainerAlert(unitId, inAlert) {
+        var safeId = (unitId + '').replace(/[^a-zA-Z0-9_-]/g, '_');
+        var box = document.getElementById('container-' + safeId);
+        if (!box) {
+            var grid = document.getElementById('camera-grid');
+            if (grid) {
+                box = grid.querySelector('[data-peer-id="' + unitId + '"]');
+                if (!box && unitId === 'UNIDAD_MOBILE')
+                    box = grid.querySelector('.video-feed-box');
+            }
+        }
+        if (box) {
+            if (inAlert) box.classList.add('alert-pulse');
+            else box.classList.remove('alert-pulse');
         }
     }
 
