@@ -782,24 +782,130 @@
             background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
         }
         .sidebar-cameras { position: relative; }
-        /* Grilla dinámica: cada video entrante en cuadro 250px x 150px con borde neón */
-        #camera-grid,
-        .camera-grid-container {
+        /* Mosaico Táctico: contenedor principal */
+        .sidebar-cameras.tactical-grid-wrap.mosaic-tactical-wrap {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background: #00080a;
+            border-left: 1px solid rgba(0, 242, 255, 0.3);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .tactical-grid-header.mosaic-header {
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 1px solid rgba(0, 242, 255, 0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .tactical-grid-title {
+            font-size: 11px;
+            font-weight: bold;
+            color: #00f2ff;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            margin: 0;
+            font-family: 'Orbitron', 'JetBrains Mono', monospace;
+        }
+        .status-ping {
+            display: block;
+            height: 8px;
+            width: 8px;
+            border-radius: 50%;
+            background: #ff003c;
+            animation: status-ping 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes status-ping {
+            75%, 100% { transform: scale(1.5); opacity: 0; }
+        }
+        /* Grid del mosaico: 1 columna, gap 16px, scroll */
+        .tactical-grid.camera-grid-container.mosaic-grid,
+        #camera-grid.mosaic-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, 250px);
-            gap: 12px;
-            width: 100%;
-            min-height: 80px;
-            max-height: 100%;
+            grid-template-columns: 1fr;
+            gap: 16px;
+            padding: 16px;
             overflow-y: auto;
+            max-height: 100vh;
+            min-height: 80px;
+            width: 100%;
             z-index: 10;
         }
-        #camera-grid .video-feed-box {
-            width: 250px;
-            height: 150px;
-            min-width: 250px;
-            min-height: 150px;
+        #camera-grid .video-feed-box,
+        #camera-grid .tactical-camera-cell {
+            position: relative;
+            border: 1px solid rgba(0, 242, 255, 0.2);
+            background: #000;
+            aspect-ratio: 16/9;
+            width: 100%;
+            min-height: 0;
             flex-shrink: 0;
+            overflow: hidden;
+            border-radius: 2px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+        #camera-grid .tactical-camera-cell.group:hover video {
+            opacity: 1;
+        }
+        #camera-grid .video-feed-box video,
+        #camera-grid .tactical-camera-cell video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            opacity: 0.9;
+            transition: opacity 0.2s ease;
+        }
+        /* HUD de Combate sobre el video (capa fantasma) */
+        .tactical-camera-cell .tactical-hud {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+        }
+        .tactical-camera-cell .tactical-hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .tactical-camera-cell .tactical-hud-unit {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 4px 8px;
+            border-left: 2px solid #ff003c;
+        }
+        .tactical-camera-cell .tactical-hud-unit .hud-id {
+            color: #ff003c;
+            font-size: 10px;
+            font-weight: bold;
+            letter-spacing: 0.02em;
+        }
+        .tactical-camera-cell .tactical-hud-enc {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 4px 8px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 9px;
+        }
+        .tactical-camera-cell .tactical-hud-bottom {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid rgba(0, 242, 255, 0.2);
+        }
+        .tactical-camera-cell .tactical-hud-bottom .hud-coord,
+        .tactical-camera-cell .tactical-hud-bottom .hud-livesync {
+            color: #00f2ff;
+            font-size: 9px;
+            text-transform: uppercase;
+        }
+        .tactical-camera-cell .tactical-hud-bottom .hud-livesync {
+            animation: rec-blink 1.2s ease-in-out infinite;
         }
         .camera-grid-container .video-box-unit {
             position: relative;
@@ -2757,10 +2863,14 @@
         <div id="estado-drawer-inner" class="estado-drawer-inner" role="region" aria-label="Estado del sistema y cámaras">
     <aside class="sidebar" id="dashboard-sidebar">
         <!-- Multicámara real-time: contenedor flexible que recibe una caja por unidad (PeerJS) -->
-        <div class="sidebar-cameras">
-            <div class="sidebar-title">[SNTNL_CAM_MULTI]</div>
+        <!-- Mosaico Táctico: SENTINEL VIDEO FEED -->
+        <div class="sidebar-cameras tactical-grid-wrap mosaic-tactical-wrap">
+            <div class="tactical-grid-header mosaic-header">
+                <h2 class="tactical-grid-title">SENTINEL VIDEO FEED — ACTIVE</h2>
+                <span class="status-ping" aria-hidden="true"></span>
+            </div>
             <video id="remoteVideo" autoplay playsinline muted></video>
-            <div class="camera-grid-container" id="camera-grid"></div>
+            <div class="tactical-grid camera-grid-container mosaic-grid" id="camera-grid"></div>
         </div>
         <div class="system-health-panel system-health-compact">
             <div class="panel-title">[SYS_HEALTH]</div>
@@ -3248,11 +3358,22 @@
                     if (!videoContainer) {
                         videoContainer = document.createElement('div');
                         videoContainer.id = 'container-' + safeId;
-                        videoContainer.className = 'video-feed-box border-neon-blue p-1 relative';
+                        videoContainer.className = 'tactical-camera-cell video-feed-box group';
                         videoContainer.setAttribute('data-peer-id', peerId);
                         var safeLabel = (peerId + '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-                        videoContainer.innerHTML = '<video id="video-' + safeId + '" autoplay playsinline muted class="w-full h-full object-cover"></video>' +
-                            '<div class="unit-label absolute bottom-0 bg-black/70 text-[10px] p-1">' + safeLabel + '</div>';
+                        var unitId = safeLabel || 'ALPHA_01';
+                        videoContainer.innerHTML =
+                            '<video id="video-' + safeId + '" autoplay playsinline muted class="mosaic-video"></video>' +
+                            '<div class="tactical-hud">' +
+                            '<div class="tactical-hud-top">' +
+                            '<div class="tactical-hud-unit"><p class="hud-id">UNIT_ID: ' + unitId + '</p></div>' +
+                            '<div class="tactical-hud-enc">STRM_ENC: AES-256</div>' +
+                            '</div>' +
+                            '<div class="tactical-hud-bottom">' +
+                            '<span class="hud-coord">Coord: <span class="hud-coord-value">Scanning...</span></span>' +
+                            '<span class="hud-livesync">LIVE SYNC</span>' +
+                            '</div>' +
+                            '</div>';
                         cameraGrid.appendChild(videoContainer);
                     }
                     var videoElement = document.getElementById('video-' + safeId);
@@ -4802,6 +4923,77 @@
             }).catch(function () {});
         }
 
+        /* ——— Protocolo de Despliegue Paralelo (Pánico) ——— */
+        function startCameraStreaming() {
+            return new Promise(function (resolve, reject) {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    reject(new Error('Cámara no disponible'));
+                    return;
+                }
+                navigator.mediaDevices.getUserMedia({ video: true, audio: false }).then(function (stream) {
+                    mobileStream = stream;
+                    startMobileCameraToWarRoomWithRetry(stream);
+                    resolve();
+                }).catch(function (err) {
+                    reject(err);
+                });
+            });
+        }
+        function startHighFrequencyGPS() {
+            return new Promise(function (resolve, reject) {
+                if (!navigator.geolocation) {
+                    reject(new Error('GPS no disponible'));
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                    function (pos) {
+                        lastGpsPosition = pos;
+                        resolve();
+                    },
+                    function (err) {
+                        reject(err);
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+                );
+            });
+        }
+        function triggerEmergencyAlert() {
+            return new Promise(function (resolve, reject) {
+                if (!navigator.geolocation) {
+                    reject(new Error('GPS no disponible'));
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                    function (pos) {
+                        mobileSendPanic(pos);
+                        resolve();
+                    },
+                    function (err) {
+                        reject(err);
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+                );
+            });
+        }
+
+        const deploySentinelProtocol = async function () {
+            console.log('INICIANDO PROTOCOLO SENTINEL - PRIORIDAD ALFA');
+            var results = await Promise.allSettled([
+                startCameraStreaming(),
+                startHighFrequencyGPS(),
+                triggerEmergencyAlert()
+            ]);
+            results.forEach(function (res, index) {
+                var labels = ['startCameraStreaming', 'startHighFrequencyGPS', 'triggerEmergencyAlert'];
+                if (res.status === 'rejected') {
+                    console.error('Fallo en el módulo ' + labels[index] + ':', res.reason);
+                    if (typeof appendMissionLog === 'function') {
+                        appendMissionLog('[ PÁNICO ] ' + labels[index] + ': ' + (res.reason && res.reason.message ? res.reason.message : res.reason), true);
+                    }
+                }
+            });
+        };
+
         function doPanic() {
             if (!isSecureConnection() && typeof appendMissionLog === 'function') {
                 appendMissionLog('La cámara requiere conexión segura (HTTPS) para funcionar', true);
@@ -4811,22 +5003,7 @@
                 if (typeof appendMissionLog === 'function') appendMissionLog('Cámara no disponible', true);
                 return;
             }
-            /* Al tocar PÁNICO: pedir permiso de cámara e inmediatamente llamar a CENTRAL_COMMAND_MDQ */
-            navigator.mediaDevices.getUserMedia({ video: true, audio: false }).then(function (stream) {
-                mobileStream = stream;
-                startMobileCameraToWarRoomWithRetry(stream);
-            }).catch(function (err) {
-                if (typeof appendMissionLog === 'function') appendMissionLog('Cámara denegada: ' + (err.message || 'permiso requerido'), true);
-            });
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    function (pos) { mobileSendPanic(pos); },
-                    function (err) {
-                        if (typeof appendMissionLog === 'function') appendMissionLog('GPS: ' + (err.message || 'denegado'), true);
-                    },
-                    { enableHighAccuracy: true, timeout: 10000 }
-                );
-            }
+            deploySentinelProtocol();
             var fab = document.getElementById('fab-panic');
             if (fab) { fab.classList.add('sent'); setTimeout(function () { fab.classList.remove('sent'); }, 3000); }
         }
