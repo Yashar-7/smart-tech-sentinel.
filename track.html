@@ -193,14 +193,13 @@
 
                 const { error } = await supabase
                     .from('unidades_live')
-                    // BUSCÁ ESTO:
                     .upsert({
-                         id: beaconId,
+                        id: beaconId,
                         name: 'Baliza En Vivo',
                         lat: latitude,
                         lng: longitude,
-                       status: 'active'
-                    });
+                        status: 'active'
+                    }, { onConflict: 'id' });
 
                 if (error) {
                     console.error("Error Supabase:", error);
@@ -232,7 +231,7 @@
                     lat: latitude,
                     lng: longitude,
                     status: 'panic'
-                });
+                }, { onConflict: 'id' });
 
                 await supabase.from('incidents_log').insert({
                     latitude: latitude,

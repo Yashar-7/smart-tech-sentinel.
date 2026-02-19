@@ -641,6 +641,11 @@
         .floating-camera-grid .floating-camera-cell.has-stream {
             display: block;
         }
+        /* Filtro de supervivencia: solo se muestran feeds con is_emergency (emergencia real) */
+        .floating-camera-grid .video-feed-box.has-stream:not([data-is-emergency="true"]),
+        .floating-camera-grid .floating-camera-cell.has-stream:not([data-is-emergency="true"]) {
+            display: none !important;
+        }
         .floating-camera-grid .floating-camera-cell video,
         .floating-camera-grid .video-feed-box video {
             width: 100%;
@@ -3246,12 +3251,18 @@
                     var accuracy = pos.coords.accuracy != null ? pos.coords.accuracy : null;
                     supabaseClient.auth.getSession().then(function (r) {
                         var session = r.data && r.data.session;
-                        var payload = { latitude: lat, longitude: lng };
+                        var payload = { latitude: lat, longitude: lng, updated_at: new Date().toISOString() };
                         if (accuracy != null) payload.accuracy = accuracy;
-                        if (session && session.user) payload.user_id = session.user.id;
-                        supabaseClient.from('locations').insert([payload]).then(function (res) {
-                            if (res.error) console.warn('locations insert:', res.error.message);
-                        });
+                        if (session && session.user) {
+                            payload.user_id = session.user.id;
+                            supabaseClient.from('locations').upsert(payload, { onConflict: 'user_id' }).then(function (res) {
+                                if (res.error) console.warn('locations upsert:', res.error.message);
+                            });
+                        } else {
+                            supabaseClient.from('locations').insert([payload]).then(function (res) {
+                                if (res.error) console.warn('locations insert:', res.error.message);
+                            });
+                        }
                     });
                 },
                 function (err) {
@@ -3297,7 +3308,7 @@
                         lat: lat,
                         lng: lng,
                         last_seen: new Date().toISOString()
-                    });
+                    }, { onConflict: 'id' });
                 if (_u.error) console.error("Error de enlace:", _u.error);
                 if (typeof map !== 'undefined') map.flyTo([lat, lng], 16, { animate: true, duration: 1.5 });
                 if (typeof syncUnidadLiveToMap === 'function') syncUnidadLiveToMap(row);
@@ -3483,6 +3494,7 @@
                         videoContainer.id = 'container-' + safeId;
                         videoContainer.className = 'floating-camera-cell video-feed-box';
                         videoContainer.setAttribute('data-peer-id', peerId);
+                        videoContainer.setAttribute('data-is-emergency', 'false');
                         var safeLabel = (peerId + '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
                         var unitName = safeLabel || 'ALPHA_01';
                         videoContainer.innerHTML =
@@ -3857,12 +3869,15 @@
         if (!raw || typeof raw !== 'object') return null;
         var lat = raw.lat != null ? Number(raw.lat) : (raw.latitude != null ? Number(raw.latitude) : null);
         var lng = raw.lng != null ? Number(raw.lng) : (raw.longitude != null ? Number(raw.longitude) : null);
+        var isEmergency = raw.is_emergency;
+        if (typeof isEmergency !== 'boolean' && isEmergency !== undefined) isEmergency = isEmergency === true || isEmergency === 'true';
         return {
             id: raw.id != null ? String(raw.id) : null,
             name: raw.name,
             lat: lat,
             lng: lng,
             status: raw.status,
+            is_emergency: isEmergency,
             battery_pct: raw.battery_pct,
             signal_bars: raw.signal_bars
         };
@@ -3915,6 +3930,7 @@
             else if (id === 'UNIDAD_MOBILE' && typeof balizaLiveActive !== 'undefined' && balizaLiveActive)
                 showBalizaLive(lat, lng);
             setCameraContainerAlert(id, status === 'alert' || status === 'panic');
+            setCameraContainerEmergency(id, row.is_emergency === true || (row.is_emergency !== false && (status === 'active' || status === 'panic')));
             return;
         }
         ensureUnidadLiveMarker(id, row);
@@ -3923,9 +3939,11 @@
         if (id === 'UNIDAD_MOBILE' && (row.status || '').toLowerCase() === 'panic' && row.lat != null && row.lng != null)
             onPanicReceived(row.lat, row.lng);
         setCameraContainerAlert(id, status === 'alert' || status === 'panic');
+        setCameraContainerEmergency(id, row.is_emergency === true || (row.is_emergency !== false && (status === 'active' || status === 'panic')));
     }
     function removeUnidadLiveFromMap(id) {
         setCameraContainerAlert(id, false);
+        setCameraContainerEmergency(id, false);
         var m = unidadesLiveMarkersById[id];
         if (m) {
             map.removeLayer(m);
@@ -4293,6 +4311,27 @@
         if (box) {
             if (inAlert) box.classList.add('alert-pulse');
             else box.classList.remove('alert-pulse');
+        }
+    }
+
+    function setCameraContainerEmergency(unitId, isEmergency) {
+        var grid = document.getElementById('camera-grid');
+        if (!grid) return;
+        if (isEmergency) {
+            var box = grid.querySelector('[data-unit-id="' + unitId + '"]');
+            if (!box && unitId === 'UNIDAD_MOBILE')
+                box = grid.querySelector('.video-feed-box.has-stream:not([data-is-emergency="true"])');
+            if (!box && unitId === 'UNIDAD_MOBILE')
+                box = grid.querySelector('.video-feed-box.has-stream');
+            if (box) {
+                box.setAttribute('data-unit-id', unitId);
+                box.setAttribute('data-is-emergency', 'true');
+            }
+        } else {
+            var toRemove = grid.querySelectorAll('[data-unit-id="' + unitId + '"]');
+            toRemove.forEach(function (el) {
+                if (el && el.parentNode) el.remove();
+            });
         }
     }
 
@@ -4869,7 +4908,7 @@
             lat: lat,
             lng: lng,
             status: 'active'
-        }).then(function (r) {
+        }, { onConflict: 'id' }).then(function (r) {
             if (r.error) console.warn('unidades_live mobile:', r.error.message);
         });
     }
@@ -4883,7 +4922,7 @@
             lat: lat,
             lng: lng,
             status: 'panic'
-        }).then(function () {});
+        }, { onConflict: 'id' }).then(function () {});
         supabaseClient.from('incidents_log').insert({
             latitude: lat,
             longitude: lng,
