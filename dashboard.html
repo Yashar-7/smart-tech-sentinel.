@@ -2363,6 +2363,12 @@
             inset: 0;
             z-index: 1;
         }
+        /* GPS Motion: transición fluida en marcadores (estilo Oyoon/Dubái) */
+        .map-sentinel-wrap .leaflet-marker-pane .leaflet-marker-icon,
+        .map-sentinel-wrap .leaflet-overlay-pane svg,
+        .map-sentinel-wrap .leaflet-overlay-pane .leaflet-marker-icon {
+            transition: transform 0.5s linear;
+        }
         /* The Grid: cuadrícula ultra fina sobre el mapa */
         .map-grid-overlay {
             position: absolute;
@@ -3512,17 +3518,24 @@
                 call.on('close', function () {
                     var box = document.getElementById('container-' + safeId);
                     if (box) box.remove();
+                    if (typeof remoteStreamRef !== 'undefined' && remoteStreamRef) {
+                        try { remoteStreamRef.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+                    }
                 });
+                var remoteStreamRef = null;
                 call.on('stream', function (remoteStream) {
+                    remoteStreamRef = remoteStream;
                     var hasStream = !!(remoteStream && remoteStream.active);
                     console.log('Stream recibido: [' + (hasStream ? 'SI' : 'NO') + ']');
                     if (!remoteStream) return;
+                    var baseUnitId = (peerId + '').replace(/_s\d+$/, '');
                     var videoContainer = document.getElementById('container-' + safeId);
                     if (!videoContainer) {
                         videoContainer = document.createElement('div');
                         videoContainer.id = 'container-' + safeId;
                         videoContainer.className = 'floating-camera-cell video-feed-box';
                         videoContainer.setAttribute('data-peer-id', peerId);
+                        videoContainer.setAttribute('data-unit-id', baseUnitId || peerId);
                         videoContainer.setAttribute('data-is-emergency', 'false');
                         var safeLabel = (peerId + '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
                         var unitName = safeLabel || 'ALPHA_01';
@@ -3965,15 +3978,15 @@
         if (m) {
             var from = m.getLatLng();
             var to = L.latLng(lat, lng);
-            smoothMoveMarker(m, from, to, 1500, function () {
+            smoothMoveMarker(m, from, to, 500, function () {
                 if (m.setStyle) m.setStyle(getCircleMarkerOptionsForUnidadLive(row.status));
                 m.setPopupContent(popupHtml);
             });
             m.setPopupContent(popupHtml);
             if (m.setStyle) m.setStyle(getCircleMarkerOptionsForUnidadLive(row.status));
             updateFirstLiveUnitUI();
-            if (id === 'UNIDAD_MOBILE' && (row.status || '').toLowerCase() === 'panic')
-                onPanicReceived(lat, lng);
+            if ((row.status || '').toLowerCase() === 'panic')
+                onPanicReceived(lat, lng, id);
             else if (id === 'UNIDAD_MOBILE' && typeof balizaLiveActive !== 'undefined' && balizaLiveActive)
                 showBalizaLive(lat, lng);
             setCameraContainerAlert(id, status === 'alert' || status === 'panic');
@@ -3983,8 +3996,8 @@
         ensureUnidadLiveMarker(id, row);
         appendMissionLog('BEACON DETECTED: ' + (row.name || 'Unidad'), false);
         updateFirstLiveUnitUI();
-        if (id === 'UNIDAD_MOBILE' && (row.status || '').toLowerCase() === 'panic' && row.lat != null && row.lng != null)
-            onPanicReceived(row.lat, row.lng);
+        if ((row.status || '').toLowerCase() === 'panic' && row.lat != null && row.lng != null)
+            onPanicReceived(row.lat, row.lng, id);
         setCameraContainerAlert(id, status === 'alert' || status === 'panic');
         setCameraContainerEmergency(id, row.is_emergency === true || (row.is_emergency !== false && (status === 'active' || status === 'panic')));
     }
@@ -4287,8 +4300,8 @@
                 var row = normalizeUnidadLiveRow(payload.new) || payload.new;
                 if (row && row.id) {
                     syncUnidadLiveToMap(row);
-                    if (row.id === 'UNIDAD_MOBILE' && (row.status || '').toLowerCase() === 'panic' && row.lat != null && row.lng != null)
-                        onPanicReceived(row.lat, row.lng);
+                    if ((row.status || '').toLowerCase() === 'panic' && row.lat != null && row.lng != null)
+                        onPanicReceived(row.lat, row.lng, row.id);
                     else if (row.id === 'UNIDAD_MOBILE' && balizaLiveActive && row.lat != null && row.lng != null)
                         showBalizaLive(row.lat, row.lng);
                 }
@@ -4299,8 +4312,8 @@
                 var row = normalizeUnidadLiveRow(payload.new) || payload.new;
                 if (row && row.id) {
                     syncUnidadLiveToMap(row);
-                    if (row.id === 'UNIDAD_MOBILE' && (row.status || '').toLowerCase() === 'panic' && row.lat != null && row.lng != null)
-                        onPanicReceived(row.lat, row.lng);
+                    if ((row.status || '').toLowerCase() === 'panic' && row.lat != null && row.lng != null)
+                        onPanicReceived(row.lat, row.lng, row.id);
                     else if (row.id === 'UNIDAD_MOBILE' && balizaLiveActive && row.lat != null && row.lng != null)
                         showBalizaLive(row.lat, row.lng);
                 }
@@ -4322,24 +4335,19 @@
         balizaLiveActive = true;
     }
 
-    function onPanicReceived(lat, lng) {
-        /* Auto-Zoom: volar el mapa a la ubicación GPS de la persona en pánico */
+    function onPanicReceived(lat, lng, unitId) {
+        var id = unitId || 'UNIDAD_MOBILE';
         if (typeof map !== 'undefined') map.flyTo([lat, lng], 18, { animate: true, duration: 2 });
         showBalizaLive(lat, lng);
         if (typeof appendMissionLog === 'function') appendMissionLog('ALERT: PÁNICO RECIBIDO — BALIZA EN VIVO', true);
-        /* Alerta visual: parpadear en rojo neón el cuadro de video de esa persona */
-        var safeMobileId = ('UNIDAD_MOBILE').replace(/[^a-zA-Z0-9_-]/g, '_');
-        var panicBox = document.getElementById('container-' + safeMobileId);
-        if (!panicBox) {
-            var grid = document.getElementById('camera-grid');
-            if (grid) panicBox = grid.querySelector('.video-feed-box');
-        }
+        var grid = document.getElementById('camera-grid');
+        var panicBox = grid ? grid.querySelector('[data-unit-id="' + id + '"]') : null;
+        if (!panicBox) panicBox = document.getElementById('container-' + (id + '').replace(/[^a-zA-Z0-9_-]/g, '_'));
+        if (!panicBox && grid) panicBox = grid.querySelector('.video-feed-box.has-stream');
         if (panicBox) {
             panicBox.classList.add('panic-alert', 'alert-pulse');
             setTimeout(function () {
-                if (panicBox && panicBox.parentNode) {
-                    panicBox.classList.remove('panic-alert', 'alert-pulse');
-                }
+                if (panicBox && panicBox.parentNode) panicBox.classList.remove('panic-alert', 'alert-pulse');
             }, 15000);
         }
     }
@@ -4350,7 +4358,8 @@
         if (!box) {
             var grid = document.getElementById('camera-grid');
             if (grid) {
-                box = grid.querySelector('[data-peer-id="' + unitId + '"]');
+                box = grid.querySelector('[data-unit-id="' + unitId + '"]');
+                if (!box) box = grid.querySelector('[data-peer-id="' + unitId + '"]');
                 if (!box && unitId === 'UNIDAD_MOBILE')
                     box = grid.querySelector('.video-feed-box');
             }

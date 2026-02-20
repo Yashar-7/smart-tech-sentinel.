@@ -286,6 +286,9 @@
             updateHudTelemetry();
 
             function getUnitId() { return currentUserId || BEACON_ID; }
+            function getStreamSessionId() {
+                return getUnitId() + '_s' + Date.now();
+            }
 
             var locationWatchId = null;
             supabase.auth.getSession().then(function (r) {
@@ -374,14 +377,14 @@
                 });
             }
 
-            // ——— Streaming a War Room: ID = Supabase Auth user_id (estable, no cambia al refrescar) ———
+            // ——— Streaming a War Room: ID de sesión único por activación (evita colisiones al reactivar) ———
             var RECONNECT_INTERVAL_MS = 3000;
             function startStreamToWarRoom(stream) {
                 if (typeof Peer === 'undefined') {
                     console.warn('PeerJS no cargado — stream no enviado');
                     return;
                 }
-                var streamId = getUnitId();
+                var streamId = getStreamSessionId();
                 if (!stream || !stream.active) {
                     console.warn('Stream inactivo o perdido');
                     return;
@@ -512,19 +515,28 @@
                 startPanic();
             });
 
-            // ——— Control de zombies: desconectar y limpiar slot al cerrar o detener ———
+            // ——— Limpieza completa WebRTC: PeerConnections y MediaStreams al desactivar is_panic ———
             function cleanupCameraAndNotify() {
                 setBeaconState(false);
                 setLiveIndicator(false);
                 btnDetener.classList.remove('visible');
                 if (panicRetryTimer) { clearInterval(panicRetryTimer); panicRetryTimer = null; }
-                if (mobileStream) {
-                    mobileStream.getTracks().forEach(function (t) { t.stop(); });
-                    mobileStream = null;
-                }
+                var callToClose = mobileCall;
+                var peerToDestroy = mobilePeer;
+                var streamToStop = mobileStream;
+                mobileCall = null;
+                mobilePeer = null;
+                mobileStream = null;
                 window._sentinelPanicStream = null;
-                if (mobileCall) { try { mobileCall.close(); } catch (e) {} mobileCall = null; }
-                if (mobilePeer) { try { mobilePeer.destroy(); } catch (e) {} mobilePeer = null; }
+                if (callToClose) {
+                    try { callToClose.close(); } catch (e) {}
+                }
+                if (peerToDestroy) {
+                    try { peerToDestroy.destroy(); } catch (e) {}
+                }
+                if (streamToStop) {
+                    streamToStop.getTracks().forEach(function (t) { t.stop(); });
+                }
                 supabase.from('unidades_live').upsert({
                     id: getUnitId(),
                     name: 'Baliza En Vivo',
