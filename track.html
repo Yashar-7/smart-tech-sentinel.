@@ -195,6 +195,7 @@
             text-decoration: none;
             font-size: 0.75rem;
         }
+        .leaflet-control-attribution { display: none !important; }
     </style>
 </head>
 <body>
@@ -231,6 +232,8 @@
             const BEACON_ID = 'UNIDAD_MOBILE';
             const WAR_ROOM_PEER_ID = 'CENTRAL_COMMAND_MDQ';
 
+            var currentUserId = null;
+
             let mobilePeer = null;
             let mobileCall = null;
             let mobileStream = null;
@@ -251,7 +254,7 @@
                 attribution: '',
                 maxZoom: 19
             }).addTo(map);
-            try { map.removeControl(map.attributionControl); } catch (e) {}
+            try { if (map.attributionControl) map.removeControl(map.attributionControl); } catch (e) {}
             L.control.zoom({ position: 'bottomright' }).addTo(map);
             const selfMarker = L.circleMarker([-37.994, -57.553], {
                 radius: 10,
@@ -282,6 +285,50 @@
             setInterval(updateHudTelemetry, 5000);
             updateHudTelemetry();
 
+            function getUnitId() { return currentUserId || BEACON_ID; }
+
+            var locationWatchId = null;
+            supabase.auth.getSession().then(function (r) {
+                var session = r.data && r.data.session;
+                if (session && session.user) currentUserId = session.user.id;
+                supabase.auth.onAuthStateChange(function (event, session) {
+                    currentUserId = (session && session.user) ? session.user.id : null;
+                    if (currentUserId && navigator.geolocation && !locationWatchId) startLocationWatch();
+                    if (!currentUserId && locationWatchId) {
+                        navigator.geolocation.clearWatch(locationWatchId);
+                        locationWatchId = null;
+                    }
+                });
+                if (currentUserId && navigator.geolocation) startLocationWatch();
+            });
+            function startLocationWatch() {
+                if (locationWatchId || !currentUserId) return;
+                locationWatchId = navigator.geolocation.watchPosition(
+                    function (pos) {
+                        if (currentUserId) sendLocationToSupabase(pos).then(function (res) {
+                            if (res.error) console.warn('locations:', res.error.message);
+                        });
+                    },
+                    function () {},
+                    { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+                );
+            }
+
+            function sendLocationToSupabase(pos) {
+                var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
+                var payload = {
+                    latitude: lat,
+                    longitude: lng,
+                    updated_at: new Date().toISOString()
+                };
+                if (acc != null) payload.accuracy = acc;
+                if (currentUserId) {
+                    payload.user_id = currentUserId;
+                    return supabase.from('locations').upsert(payload, { onConflict: 'user_id' });
+                }
+                return Promise.resolve({ data: null, error: null });
+            }
+
             function setLiveIndicator(active) {
                 if (active) hudLive.classList.add('active'); else hudLive.classList.remove('active');
             }
@@ -302,12 +349,13 @@
                 }
             }
 
-            // ——— Envío de coordenadas y alerta War Room ———
+            // ——— Envío de coordenadas, locations (user_id real) y alerta War Room ———
             function sendPanicToSupabase(pos) {
                 var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
-                return Promise.all([
+                var unitId = getUnitId();
+                var promises = [
                     supabase.from('unidades_live').upsert({
-                        id: BEACON_ID,
+                        id: unitId,
                         name: 'Baliza En Vivo',
                         lat: lat,
                         lng: lng,
@@ -318,20 +366,22 @@
                         longitude: lng,
                         incident_type: 'panic',
                         event_time: new Date().toISOString()
-                    })
-                ]).then(function () {
+                    }),
+                    sendLocationToSupabase(pos)
+                ];
+                return Promise.all(promises).then(function () {
                     updateSelfMarker(lat, lng);
                 });
             }
 
-            // ——— Streaming a War Room: mismo ID que el GPS (BEACON_ID = user_id / Unidad_ID) ———
+            // ——— Streaming a War Room: ID = Supabase Auth user_id (estable, no cambia al refrescar) ———
             var RECONNECT_INTERVAL_MS = 3000;
             function startStreamToWarRoom(stream) {
                 if (typeof Peer === 'undefined') {
                     console.warn('PeerJS no cargado — stream no enviado');
                     return;
                 }
-                var streamId = BEACON_ID;
+                var streamId = getUnitId();
                 if (!stream || !stream.active) {
                     console.warn('Stream inactivo o perdido');
                     return;
@@ -425,7 +475,7 @@
                     .then(function (stream) {
                         mobileStream = stream;
                         window._sentinelPanicStream = stream;
-                        console.log('Stream iniciado con ID (mismo que GPS):', BEACON_ID);
+                        console.log('Stream iniciado con ID (Supabase Auth user_id):', getUnitId());
                         startStreamToWarRoom(stream);
                         streamDone = true;
                         maybeFinish();
@@ -476,7 +526,7 @@
                 if (mobileCall) { try { mobileCall.close(); } catch (e) {} mobileCall = null; }
                 if (mobilePeer) { try { mobilePeer.destroy(); } catch (e) {} mobilePeer = null; }
                 supabase.from('unidades_live').upsert({
-                    id: BEACON_ID,
+                    id: getUnitId(),
                     name: 'Baliza En Vivo',
                     lat: null,
                     lng: null,
