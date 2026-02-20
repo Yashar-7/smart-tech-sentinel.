@@ -230,8 +230,6 @@
 
             const BEACON_ID = 'UNIDAD_MOBILE';
             const WAR_ROOM_PEER_ID = 'CENTRAL_COMMAND_MDQ';
-            // ID del canal de video: debe coincidir exactamente con el Unidad_ID que muestra el War Room (ej. agzof9)
-            const STREAM_PEER_ID = 'agzof9';
 
             let mobilePeer = null;
             let mobileCall = null;
@@ -326,13 +324,14 @@
                 });
             }
 
-            // ——— Streaming a War Room: ID = STREAM_PEER_ID (mismo que Unidad_ID en War Room, ej. agzof9) ———
+            // ——— Streaming a War Room: mismo ID que el GPS (BEACON_ID = user_id / Unidad_ID) ———
+            var RECONNECT_INTERVAL_MS = 3000;
             function startStreamToWarRoom(stream) {
                 if (typeof Peer === 'undefined') {
                     console.warn('PeerJS no cargado — stream no enviado');
                     return;
                 }
-                var streamId = STREAM_PEER_ID;
+                var streamId = BEACON_ID;
                 if (!stream || !stream.active) {
                     console.warn('Stream inactivo o perdido');
                     return;
@@ -340,12 +339,14 @@
                 window._sentinelPanicStream = stream;
                 console.log('Stream iniciado con ID:', streamId);
                 function tryCall() {
+                    if (!window._sentinelPanicStream || !window._sentinelPanicStream.active) return;
+                    var currentStream = window._sentinelPanicStream;
                     try {
                         if (mobileCall) { try { mobileCall.close(); } catch (e) {} mobileCall = null; }
                         if (mobilePeer) { try { mobilePeer.destroy(); } catch (e) {} mobilePeer = null; }
                         mobilePeer = new Peer(streamId);
                         mobilePeer.on('open', function () {
-                            mobileCall = mobilePeer.call(WAR_ROOM_PEER_ID, stream);
+                            mobileCall = mobilePeer.call(WAR_ROOM_PEER_ID, currentStream);
                             if (mobileCall) {
                                 mobileCall.on('stream', function () {
                                     if (panicRetryTimer) { clearInterval(panicRetryTimer); panicRetryTimer = null; }
@@ -355,26 +356,46 @@
                                 });
                                 mobileCall.on('close', function () {
                                     setLiveIndicator(false);
-                                    if (stream && stream.active) setTimeout(tryCall, 2000);
+                                    if (currentStream && currentStream.active) {
+                                        if (panicRetryTimer) clearInterval(panicRetryTimer);
+                                        panicRetryTimer = setInterval(tryCall, RECONNECT_INTERVAL_MS);
+                                    }
                                 });
                                 mobileCall.on('error', function () {
-                                    if (!panicRetryTimer) panicRetryTimer = setInterval(tryCall, 3000);
+                                    if (currentStream && currentStream.active) {
+                                        if (panicRetryTimer) clearInterval(panicRetryTimer);
+                                        panicRetryTimer = setInterval(tryCall, RECONNECT_INTERVAL_MS);
+                                    }
                                 });
                             }
                         });
                         mobilePeer.on('error', function (err) {
                             console.warn('PeerJS error:', err && (err.type || err.message));
-                            if (!panicRetryTimer) panicRetryTimer = setInterval(tryCall, 3000);
+                            if (currentStream && currentStream.active) {
+                                if (panicRetryTimer) clearInterval(panicRetryTimer);
+                                panicRetryTimer = setInterval(tryCall, RECONNECT_INTERVAL_MS);
+                            }
                         });
                     } catch (e) {
                         console.warn('startStreamToWarRoom catch:', e);
-                        if (!panicRetryTimer) panicRetryTimer = setInterval(tryCall, 3000);
+                        if (currentStream && currentStream.active) {
+                            if (panicRetryTimer) clearInterval(panicRetryTimer);
+                            panicRetryTimer = setInterval(tryCall, RECONNECT_INTERVAL_MS);
+                        }
                     }
                 }
                 tryCall();
             }
 
-            // ——— startPanic: permiso de cámara INMEDIATAMENTE al presionar; luego coords + stream ———
+            // ——— Captura robusta: video+audio; si falla, solo video ———
+            function getCameraStream() {
+                return navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                    .catch(function () {
+                        return navigator.mediaDevices.getUserMedia({ video: true });
+                    });
+            }
+
+            // ——— startPanic: permiso de cámara INMEDIATAMENTE al presionar; mismo ID que GPS (BEACON_ID) ———
             function startPanic() {
                 setBeaconState(true);
                 panicBtn.classList.add('sent');
@@ -400,11 +421,11 @@
                     }
                 }
 
-                navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                getCameraStream()
                     .then(function (stream) {
                         mobileStream = stream;
                         window._sentinelPanicStream = stream;
-                        console.log('Stream iniciado con ID:', STREAM_PEER_ID);
+                        console.log('Stream iniciado con ID (mismo que GPS):', BEACON_ID);
                         startStreamToWarRoom(stream);
                         streamDone = true;
                         maybeFinish();
