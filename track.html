@@ -8,12 +8,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         :root {
             --neon-cyan: #00f2ff;
             --dark-bg: #050508;
             --gray-off: #2a2a2e;
+            --hud-bg: rgba(5, 5, 12, 0.92);
         }
         * { box-sizing: border-box; }
         html, body {
@@ -24,10 +28,6 @@
             background: var(--dark-bg);
             color: var(--neon-cyan);
             font-family: 'VT323', 'JetBrains Mono', monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
             overflow: hidden;
             -webkit-tap-highlight-color: transparent;
         }
@@ -40,249 +40,339 @@
                 linear-gradient(90deg, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
             background-size: 24px 24px;
             pointer-events: none;
+            z-index: 0;
         }
-        .track-wrap {
-            position: relative;
+        /* Mapa 90% pantalla */
+        .map-wrap {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 90vh;
+            height: 90dvh;
             z-index: 1;
-            width: 100%;
-            max-width: 420px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
         }
-        .track-title {
-            font-size: clamp(1rem, 4vw, 1.2rem);
-            letter-spacing: 4px;
-            color: rgba(0, 242, 255, 0.85);
-            text-align: center;
-        }
-        .beacon-btn-wrap {
-            position: relative;
-            width: min(200px, 72vw);
-            height: min(200px, 72vw);
-        }
-        .beacon-btn {
+        #map {
             width: 100%;
             height: 100%;
-            border-radius: 50%;
-            border: 4px solid var(--gray-off);
-            background: radial-gradient(circle at 35% 35%, #1a1a1e, var(--dark-bg));
-            color: #666;
-            font-family: 'VT323', 'JetBrains Mono', monospace;
-            font-size: clamp(0.9rem, 3.2vw, 1rem);
-            letter-spacing: 2px;
-            cursor: pointer;
+            background: #0a0a0f;
+        }
+        .leaflet-tile-pane { filter: contrast(1.1) brightness(0.75) saturate(0.85); }
+        .leaflet-control-zoom { border: 1px solid rgba(0, 242, 255, 0.4) !important; }
+        .leaflet-control-zoom a { color: var(--neon-cyan) !important; background: var(--hud-bg) !important; }
+        .leaflet-control-zoom a:hover { background: rgba(0, 242, 255, 0.15) !important; }
+
+        /* Zona de controles: 10% inferior */
+        .controls-wrap {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 10vh;
+            height: 10dvh;
+            min-height: 72px;
+            z-index: 10;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 4px;
-            transition: all 0.3s;
+            gap: 6px;
+            padding: 8px 16px;
         }
-        .beacon-btn.transmitting {
-            border-color: #00ff88;
-            color: #00ff88;
-            box-shadow: 0 0 40px rgba(0, 255, 136, 0.4);
-            animation: blink 1.2s infinite;
-        }
-        .beacon-btn.connecting {
-            border-color: #ffcc00;
-            color: #ffcc00;
-            animation: blink 0.8s infinite;
+        .panic-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
         .panic-btn {
-            width: 100%;
-            max-width: 200px;
-            padding: 14px 24px;
+            padding: 10px 20px;
             font-family: 'VT323', 'JetBrains Mono', monospace;
             font-size: 1.1rem;
             letter-spacing: 3px;
             color: #ff0040;
-            background: rgba(255, 0, 64, 0.1);
+            background: rgba(255, 0, 64, 0.15);
             border: 2px solid #ff0040;
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s;
-            box-shadow: 0 0 20px rgba(255, 0, 64, 0.2);
+            box-shadow: 0 0 20px rgba(255, 0, 64, 0.25);
         }
         .panic-btn:hover {
-            background: rgba(255, 0, 64, 0.25);
-            box-shadow: 0 0 30px rgba(255, 0, 64, 0.4);
+            background: rgba(255, 0, 64, 0.3);
+            box-shadow: 0 0 30px rgba(255, 0, 64, 0.45);
         }
         .panic-btn:active { transform: scale(0.98); }
         .panic-btn.sent {
             color: #00ff88;
             border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.2);
             box-shadow: 0 0 25px rgba(0, 255, 136, 0.5);
         }
-        @keyframes blink {
-            50% { opacity: 0.7; }
+        .btn-detener {
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            color: var(--neon-cyan);
+            background: transparent;
+            border: 1px solid rgba(0, 242, 255, 0.5);
+            border-radius: 6px;
+            padding: 6px 12px;
+            cursor: pointer;
+            display: none;
         }
-        .sentinel-logo { width: 40%; height: auto; margin-bottom: 5px; }
-        .beacon-state-text { min-height: 1.5em; text-align: center; font-size: 1.1rem; }
-        .beacon-state-text.connected { color: #00ff88; text-shadow: 0 0 10px #00ff88; }
-        .beacon-state-text.error { color: #ff4444; }
-        .beacon-live {
-            width: 100%;
-            background: rgba(0,0,0,0.5);
-            padding: 15px;
-            border: 1px solid rgba(0,242,255,0.2);
-            border-radius: 8px;
+        .btn-detener.visible { display: inline-block; }
+        .btn-detener:hover { background: rgba(0, 242, 255, 0.1); }
+
+        /* HUD overlay minimalista en la base */
+        .hud-overlay {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 12px 8px;
+            background: linear-gradient(to top, var(--hud-bg), transparent);
+            pointer-events: none;
         }
-        .row { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 4px; }
-        .value { color: var(--neon-cyan); }
-        .track-link a { color: #555; text-decoration: none; font-size: 0.8rem; margin-top: 20px; display: block; }
+        .hud-overlay .hud-left, .hud-overlay .hud-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.7rem;
+            color: rgba(0, 242, 255, 0.9);
+            text-shadow: 0 0 8px rgba(0, 242, 255, 0.4);
+        }
+        .hud-overlay .hud-live {
+            color: #ff0040;
+            font-weight: 600;
+            letter-spacing: 2px;
+        }
+        .hud-overlay .hud-live.active {
+            animation: live-blink 1s ease-in-out infinite;
+        }
+        @keyframes live-blink {
+            50% { opacity: 0.5; }
+        }
+        .track-link {
+            position: fixed;
+            top: 8px;
+            left: 8px;
+            z-index: 15;
+            pointer-events: auto;
+        }
+        .track-link a {
+            color: rgba(0, 242, 255, 0.7);
+            text-decoration: none;
+            font-size: 0.75rem;
+        }
     </style>
 </head>
 <body>
-    <div class="track-wrap">
-        <div class="track-title">[ THE BEACON ]</div>
-        <div class="beacon-btn-wrap">
-            <button type="button" id="beacon-btn" class="beacon-btn">
-                <svg class="sentinel-logo" viewBox="0 0 80 80" fill="none" stroke="currentColor">
-                    <circle cx="40" cy="40" r="26" stroke-width="2"/>
-                    <circle cx="40" cy="40" r="10" fill="currentColor"/>
-                </svg>
-                <span id="beacon-btn-label">ACTIVAR BALIZA</span>
-            </button>
+    <p class="track-link"><a href="dashboard.html">← WAR ROOM</a></p>
+    <div class="map-wrap">
+        <div id="map"></div>
+    </div>
+    <div class="hud-overlay">
+        <div class="hud-left">
+            <span id="hud-battery">BAT —</span>
+            <span id="hud-signal">SIG —</span>
         </div>
-        <button type="button" id="panic-btn" class="panic-btn" aria-label="Enviar señal de pánico">PÁNICO</button>
-        <div id="beacon-state-text" class="beacon-state-text"></div>
-        <div class="beacon-live">
-            <div class="row"><span>LATITUD:</span><span id="beacon-lat" class="value">—</span></div>
-            <div class="row"><span>LONGITUD:</span><span id="beacon-lng" class="value">—</span></div>
-            <div class="row"><span>PRECISIÓN:</span><span id="beacon-precision" class="value">—</span></div>
+        <div class="hud-right">
+            <span class="hud-live" id="hud-live">LIVE</span>
         </div>
-        <div id="beacon-status" style="font-size: 0.7rem; color: #444; margin-top: 10px;"></div>
-        <p class="track-link"><a href="dashboard.html">← VOLVER AL WAR ROOM</a></p>
+    </div>
+    <div class="controls-wrap">
+        <div class="panic-row">
+            <button type="button" id="panic-btn" class="panic-btn" aria-label="Pánico One-Touch">¡PÁNICO!</button>
+            <button type="button" id="btn-detener" class="btn-detener" aria-label="Detener emergencia">DETENER EMERGENCIA</button>
+        </div>
     </div>
 
     <script>
         (function () {
-            // CONFIGURACIÓN SUPABASE
             const SUPABASE_URL = 'https://svpurpvbiujhcbiugrkh.supabase.co';
             const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2cHVycHZiaXVqaGNiaXVncmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NDgzMTUsImV4cCI6MjA4MzMyNDMxNX0.AivKJ0_N0z_4T4vLNfUcE2hepJ1XXOO8-4fSA3PJXdc';
-            
-            // CORRECCIÓN AQUÍ: Usar window.supabase para evitar error de referencia
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-            const btn = document.getElementById('beacon-btn');
-            const btnLabel = document.getElementById('beacon-btn-label');
-            const stateTextEl = document.getElementById('beacon-state-text');
-            const statusEl = document.getElementById('beacon-status');
-            const latEl = document.getElementById('beacon-lat');
-            const lngEl = document.getElementById('beacon-lng');
-            const precisionEl = document.getElementById('beacon-precision');
+            const BEACON_ID = 'UNIDAD_MOBILE';
+            const WAR_ROOM_PEER_ID = 'CENTRAL_COMMAND_MDQ';
 
-            let watchId = null;
-            let beaconId = 'UNIDAD_MOBILE';
+            let mobilePeer = null;
+            let mobileCall = null;
+            let mobileStream = null;
+            let panicRetryTimer = null;
 
-            function setState(msg, type = '') {
-                stateTextEl.textContent = msg;
-                stateTextEl.className = 'beacon-state-text ' + type;
+            const mapEl = document.getElementById('map');
+            const panicBtn = document.getElementById('panic-btn');
+            const btnDetener = document.getElementById('btn-detener');
+            const hudLive = document.getElementById('hud-live');
+            const hudBattery = document.getElementById('hud-battery');
+            const hudSignal = document.getElementById('hud-signal');
+
+            // ——— Mapa táctico Dark Mode HUD ———
+            const map = L.map('map', { zoomControl: false }).setView([-37.994, -57.553], 12);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OSM, CartoDB',
+                maxZoom: 19
+            }).addTo(map);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+            const selfMarker = L.circleMarker([-37.994, -57.553], {
+                radius: 10,
+                fillColor: '#00f2ff',
+                color: '#00f2ff',
+                weight: 2,
+                fillOpacity: 0.9
+            }).addTo(map);
+
+            function updateSelfMarker(lat, lng) {
+                selfMarker.setLatLng([lat, lng]);
+                map.setView([lat, lng], map.getZoom(), { animate: true });
             }
 
-            async function sendPosition(pos) {
-                const { latitude, longitude, accuracy } = pos.coords;
-                
-                latEl.textContent = latitude.toFixed(6);
-                lngEl.textContent = longitude.toFixed(6);
-                precisionEl.textContent = Math.round(accuracy) + 'm';
+            // ——— Telemetría HUD ———
+            function updateHudTelemetry() {
+                if (navigator.getBattery) {
+                    navigator.getBattery().then(function (b) {
+                        var pct = Math.round(b.level * 100);
+                        hudBattery.textContent = 'BAT ' + pct + '%';
+                    }).catch(function () { hudBattery.textContent = 'BAT —'; });
+                } else { hudBattery.textContent = 'BAT —'; }
+                var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                if (conn && conn.effectiveType) {
+                    hudSignal.textContent = 'SIG ' + (conn.effectiveType || '—').toUpperCase();
+                } else { hudSignal.textContent = 'SIG —'; }
+            }
+            setInterval(updateHudTelemetry, 5000);
+            updateHudTelemetry();
 
-                const { error } = await supabase
-                    .from('unidades_live')
-                    .upsert({
-                        id: beaconId,
+            function setLiveIndicator(active) {
+                if (active) hudLive.classList.add('active'); else hudLive.classList.remove('active');
+            }
+
+            // ——— Envío de coordenadas y alerta War Room ———
+            function sendPanicToSupabase(pos) {
+                var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
+                return Promise.all([
+                    supabase.from('unidades_live').upsert({
+                        id: BEACON_ID,
                         name: 'Baliza En Vivo',
-                        lat: latitude,
-                        lng: longitude,
-                        status: 'active'
-                    }, { onConflict: 'id' });
-
-                if (error) {
-                    console.error("Error Supabase:", error);
-                    setState("ERROR DE CONEXIÓN", "error");
-                    alert("⚠️ ERROR SUPABASE: " + error.message);
-                } else {
-                    setState("CONECTADO AL RADAR", "connected");
-                    statusEl.textContent = "Último pulso: " + new Date().toLocaleTimeString();
-                }
-            }
-
-            async function sendPanic(pos) {
-                const { latitude, longitude, accuracy } = pos.coords;
-                latEl.textContent = latitude.toFixed(6);
-                lngEl.textContent = longitude.toFixed(6);
-                if (precisionEl) precisionEl.textContent = Math.round(accuracy || 0) + 'm';
-
-                const panicBtn = document.getElementById('panic-btn');
-                panicBtn.classList.add('sent');
-                panicBtn.textContent = 'PÁNICO ENVIADO';
-                setTimeout(() => {
-                    panicBtn.classList.remove('sent');
-                    panicBtn.textContent = 'PÁNICO';
-                }, 3000);
-
-                await supabase.from('unidades_live').upsert({
-                    id: beaconId,
-                    name: 'Baliza En Vivo',
-                    lat: latitude,
-                    lng: longitude,
-                    status: 'panic'
-                }, { onConflict: 'id' });
-
-                await supabase.from('incidents_log').insert({
-                    latitude: latitude,
-                    longitude: longitude,
-                    incident_type: 'panic',
-                    event_time: new Date().toISOString()
+                        lat: lat,
+                        lng: lng,
+                        status: 'panic'
+                    }, { onConflict: 'id' }),
+                    supabase.from('incidents_log').insert({
+                        latitude: lat,
+                        longitude: lng,
+                        incident_type: 'panic',
+                        event_time: new Date().toISOString()
+                    })
+                ]).then(function () {
+                    updateSelfMarker(lat, lng);
                 });
-
-                setState("PÁNICO ENVIADO — WAR ROOM ALERTADO", "connected");
-                if (statusEl) statusEl.textContent = "Último pánico: " + new Date().toLocaleTimeString();
             }
 
-            btn.addEventListener('click', () => {
-                if (watchId) {
-                    navigator.geolocation.clearWatch(watchId);
-                    watchId = null;
-                    btn.classList.remove('transmitting');
-                    btnLabel.textContent = 'ACTIVAR BALIZA';
-                    setState("BALIZA APAGADA");
-                    return;
+            // ——— Streaming automático a War Room (sin botones intermedios) ———
+            function startStreamToWarRoom(stream) {
+                if (typeof Peer === 'undefined') return;
+                function tryCall() {
+                    try {
+                        if (mobileCall) { try { mobileCall.close(); } catch (e) {} mobileCall = null; }
+                        if (mobilePeer) { try { mobilePeer.destroy(); } catch (e) {} mobilePeer = null; }
+                        var peerId = BEACON_ID;
+                        mobilePeer = new Peer(peerId);
+                        mobilePeer.on('open', function () {
+                            mobileCall = mobilePeer.call(WAR_ROOM_PEER_ID, stream);
+                            if (mobileCall) {
+                                mobileCall.on('stream', function () {
+                                    if (panicRetryTimer) { clearInterval(panicRetryTimer); panicRetryTimer = null; }
+                                    setLiveIndicator(true);
+                                    btnDetener.classList.add('visible');
+                                });
+                                mobileCall.on('close', function () {
+                                    setLiveIndicator(false);
+                                    if (stream && stream.active) setTimeout(tryCall, 2000);
+                                });
+                                mobileCall.on('error', function () {
+                                    if (!panicRetryTimer) panicRetryTimer = setInterval(tryCall, 3000);
+                                });
+                            }
+                        });
+                        mobilePeer.on('error', function () {
+                            if (!panicRetryTimer) panicRetryTimer = setInterval(tryCall, 3000);
+                        });
+                    } catch (e) {
+                        if (!panicRetryTimer) panicRetryTimer = setInterval(tryCall, 3000);
+                    }
                 }
+                tryCall();
+            }
 
-                setState("Buscando satélites...", "connecting");
-                btn.classList.add('connecting');
-
-                watchId = navigator.geolocation.watchPosition(
-                    (pos) => {
-                        btn.classList.remove('connecting');
-                        btn.classList.add('transmitting');
-                        btnLabel.textContent = 'BALIZA ACTIVA';
-                        sendPosition(pos);
-                    },
-                    (err) => {
-                        setState("ERROR GPS: " + err.message, "error");
-                        btn.classList.remove('connecting');
-                        alert("Por favor, activa el GPS y permite el acceso.");
-                    },
-                    { enableHighAccuracy: true }
-                );
-            });
-
-            document.getElementById('panic-btn').addEventListener('click', () => {
+            // ——— Protocolo One-Touch: coords + alerta + streaming en cadena ———
+            function executeOneTouchPanic() {
+                panicBtn.classList.add('sent');
+                panicBtn.textContent = 'ENVIANDO…';
                 navigator.geolocation.getCurrentPosition(
-                    (pos) => sendPanic(pos),
-                    (err) => {
-                        setState("ERROR GPS: " + err.message, "error");
-                        alert("Necesitamos tu ubicación para enviar el pánico. Activa el GPS y permite el acceso.");
+                    function (pos) {
+                        sendPanicToSupabase(pos).then(function () {
+                            panicBtn.textContent = 'PÁNICO ENVIADO';
+                            setTimeout(function () {
+                                panicBtn.classList.remove('sent');
+                                panicBtn.textContent = '¡PÁNICO!';
+                            }, 3000);
+                        });
+                        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                            navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(function (stream) {
+                                mobileStream = stream;
+                                startStreamToWarRoom(stream);
+                            }).catch(function () {});
+                        }
+                    },
+                    function (err) {
+                        panicBtn.textContent = '¡PÁNICO!';
+                        panicBtn.classList.remove('sent');
+                        alert('Necesitamos ubicación. Activa GPS y permite acceso.');
                     },
                     { enableHighAccuracy: true, timeout: 10000 }
                 );
+            }
+
+            panicBtn.addEventListener('click', function () {
+                if (location.protocol !== 'https:' && !/^localhost$|^127\.0\.0\.1$/i.test(location.hostname)) {
+                    alert('La cámara requiere HTTPS.');
+                    return;
+                }
+                executeOneTouchPanic();
             });
+
+            // ——— Control de zombies: desconectar y limpiar slot al cerrar o detener ———
+            function cleanupCameraAndNotify() {
+                setLiveIndicator(false);
+                btnDetener.classList.remove('visible');
+                if (panicRetryTimer) { clearInterval(panicRetryTimer); panicRetryTimer = null; }
+                if (mobileStream) {
+                    mobileStream.getTracks().forEach(function (t) { t.stop(); });
+                    mobileStream = null;
+                }
+                if (mobileCall) { try { mobileCall.close(); } catch (e) {} mobileCall = null; }
+                if (mobilePeer) { try { mobilePeer.destroy(); } catch (e) {} mobilePeer = null; }
+                supabase.from('unidades_live').upsert({
+                    id: BEACON_ID,
+                    name: 'Baliza En Vivo',
+                    lat: null,
+                    lng: null,
+                    status: 'offline'
+                }, { onConflict: 'id' }).then(function () {});
+            }
+
+            btnDetener.addEventListener('click', function () {
+                cleanupCameraAndNotify();
+            });
+
+            window.addEventListener('beforeunload', cleanupCameraAndNotify);
+            window.addEventListener('pagehide', cleanupCameraAndNotify);
+            window.addEventListener('unload', cleanupCameraAndNotify);
         })();
     </script>
 </body>
