@@ -230,6 +230,8 @@
 
             const BEACON_ID = 'UNIDAD_MOBILE';
             const WAR_ROOM_PEER_ID = 'CENTRAL_COMMAND_MDQ';
+            // ID del canal de video: debe coincidir exactamente con el Unidad_ID que muestra el War Room (ej. agzof9)
+            const STREAM_PEER_ID = 'agzof9';
 
             let mobilePeer = null;
             let mobileCall = null;
@@ -248,9 +250,10 @@
             // ——— Mapa táctico Dark Mode HUD ———
             const map = L.map('map', { zoomControl: false }).setView([-37.994, -57.553], 12);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; OSM, CartoDB',
+                attribution: '',
                 maxZoom: 19
             }).addTo(map);
+            try { map.removeControl(map.attributionControl); } catch (e) {}
             L.control.zoom({ position: 'bottomright' }).addTo(map);
             const selfMarker = L.circleMarker([-37.994, -57.553], {
                 radius: 10,
@@ -323,13 +326,18 @@
                 });
             }
 
-            // ——— Streaming a War Room: ID debe coincidir con el que busca el Sentinel Video Feed (container-UNIDAD_MOBILE) ———
+            // ——— Streaming a War Room: ID = STREAM_PEER_ID (mismo que Unidad_ID en War Room, ej. agzof9) ———
             function startStreamToWarRoom(stream) {
                 if (typeof Peer === 'undefined') {
                     console.warn('PeerJS no cargado — stream no enviado');
                     return;
                 }
-                var streamId = BEACON_ID;
+                var streamId = STREAM_PEER_ID;
+                if (!stream || !stream.active) {
+                    console.warn('Stream inactivo o perdido');
+                    return;
+                }
+                window._sentinelPanicStream = stream;
                 console.log('Stream iniciado con ID:', streamId);
                 function tryCall() {
                     try {
@@ -395,7 +403,8 @@
                 navigator.mediaDevices.getUserMedia({ video: true, audio: true })
                     .then(function (stream) {
                         mobileStream = stream;
-                        console.log('Stream iniciado con ID:', BEACON_ID);
+                        window._sentinelPanicStream = stream;
+                        console.log('Stream iniciado con ID:', STREAM_PEER_ID);
                         startStreamToWarRoom(stream);
                         streamDone = true;
                         maybeFinish();
@@ -442,6 +451,7 @@
                     mobileStream.getTracks().forEach(function (t) { t.stop(); });
                     mobileStream = null;
                 }
+                window._sentinelPanicStream = null;
                 if (mobileCall) { try { mobileCall.close(); } catch (e) {} mobileCall = null; }
                 if (mobilePeer) { try { mobilePeer.destroy(); } catch (e) {} mobilePeer = null; }
                 supabase.from('unidades_live').upsert({
