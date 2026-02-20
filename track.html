@@ -441,11 +441,23 @@
             }
 
             // ——— Captura robusta: video+audio; si falla, solo video ———
+            // Cámara trasera (environment) prioritaria; resolución óptima para streaming rápido; fallback si no hay exact
             function getCameraStream() {
-                return navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-                    .catch(function () {
-                        return navigator.mediaDevices.getUserMedia({ video: true });
-                    });
+                var opts = [
+                    { video: { facingMode: { exact: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true },
+                    { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true },
+                    { video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }, audio: true },
+                    { video: { facingMode: 'environment' }, audio: true },
+                    { video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true },
+                    { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: true },
+                    { video: true, audio: true },
+                    { video: true }
+                ];
+                function tryNext(i) {
+                    if (i >= opts.length) return Promise.reject(new Error('No se pudo acceder a la cámara'));
+                    return navigator.mediaDevices.getUserMedia(opts[i]).catch(function () { return tryNext(i + 1); });
+                }
+                return tryNext(0);
             }
 
             // ——— startPanic: permiso de cámara INMEDIATAMENTE al presionar; mismo ID que GPS (BEACON_ID) ———
