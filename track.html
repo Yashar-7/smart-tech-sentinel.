@@ -122,6 +122,34 @@
         .btn-detener.visible { display: inline-block; }
         .btn-detener:hover { background: rgba(0, 242, 255, 0.1); }
 
+        /* Baliza: círculo estado (cian = inactivo, rojo neón = transmitiendo) */
+        .beacon-status-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+        }
+        .beacon-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--gray-off);
+            border: 2px solid rgba(0, 242, 255, 0.5);
+            transition: all 0.3s;
+        }
+        .beacon-dot.transmitting {
+            background: rgba(255, 0, 64, 0.9);
+            border-color: #ff0040;
+            box-shadow: 0 0 16px rgba(255, 0, 64, 0.8);
+            animation: beacon-pulse 1.2s ease-in-out infinite;
+        }
+        @keyframes beacon-pulse {
+            50% { opacity: 0.85; box-shadow: 0 0 24px rgba(255, 0, 64, 0.9); }
+        }
+        .beacon-state-label { color: rgba(0, 242, 255, 0.9); }
+        .beacon-state-label.transmitting { color: #ff0040; text-shadow: 0 0 10px rgba(255, 0, 64, 0.6); }
+
         /* HUD overlay minimalista en la base */
         .hud-overlay {
             position: fixed;
@@ -184,6 +212,10 @@
         </div>
     </div>
     <div class="controls-wrap">
+        <div class="beacon-status-wrap">
+            <span class="beacon-dot" id="beacon-dot" aria-hidden="true"></span>
+            <span class="beacon-state-label" id="beacon-state-label">BALIZA DESACTIVADA</span>
+        </div>
         <div class="panic-row">
             <button type="button" id="panic-btn" class="panic-btn" aria-label="Pánico One-Touch">¡PÁNICO!</button>
             <button type="button" id="btn-detener" class="btn-detener" aria-label="Detener emergencia">DETENER EMERGENCIA</button>
@@ -210,6 +242,8 @@
             const hudLive = document.getElementById('hud-live');
             const hudBattery = document.getElementById('hud-battery');
             const hudSignal = document.getElementById('hud-signal');
+            const beaconDot = document.getElementById('beacon-dot');
+            const beaconStateLabel = document.getElementById('beacon-state-label');
 
             // ——— Mapa táctico Dark Mode HUD ———
             const map = L.map('map', { zoomControl: false }).setView([-37.994, -57.553], 12);
@@ -251,6 +285,22 @@
                 if (active) hudLive.classList.add('active'); else hudLive.classList.remove('active');
             }
 
+            // Estado de la baliza: TRANSMITIENDO (rojo) o BALIZA DESACTIVADA
+            function setBeaconState(transmitting) {
+                if (beaconDot) {
+                    if (transmitting) {
+                        beaconDot.classList.add('transmitting');
+                    } else {
+                        beaconDot.classList.remove('transmitting');
+                    }
+                }
+                if (beaconStateLabel) {
+                    beaconStateLabel.textContent = transmitting ? 'TRANSMITIENDO' : 'BALIZA DESACTIVADA';
+                    if (transmitting) beaconStateLabel.classList.add('transmitting');
+                    else beaconStateLabel.classList.remove('transmitting');
+                }
+            }
+
             // ——— Envío de coordenadas y alerta War Room ———
             function sendPanicToSupabase(pos) {
                 var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
@@ -273,15 +323,19 @@
                 });
             }
 
-            // ——— Streaming automático a War Room (sin botones intermedios) ———
+            // ——— Streaming a War Room: ID debe coincidir con el que busca el Sentinel Video Feed (container-UNIDAD_MOBILE) ———
             function startStreamToWarRoom(stream) {
-                if (typeof Peer === 'undefined') return;
+                if (typeof Peer === 'undefined') {
+                    console.warn('PeerJS no cargado — stream no enviado');
+                    return;
+                }
+                var streamId = BEACON_ID;
+                console.log('Stream iniciado con ID:', streamId);
                 function tryCall() {
                     try {
                         if (mobileCall) { try { mobileCall.close(); } catch (e) {} mobileCall = null; }
                         if (mobilePeer) { try { mobilePeer.destroy(); } catch (e) {} mobilePeer = null; }
-                        var peerId = BEACON_ID;
-                        mobilePeer = new Peer(peerId);
+                        mobilePeer = new Peer(streamId);
                         mobilePeer.on('open', function () {
                             mobileCall = mobilePeer.call(WAR_ROOM_PEER_ID, stream);
                             if (mobileCall) {
@@ -289,6 +343,7 @@
                                     if (panicRetryTimer) { clearInterval(panicRetryTimer); panicRetryTimer = null; }
                                     setLiveIndicator(true);
                                     btnDetener.classList.add('visible');
+                                    console.log('Video enviado al War Room con ID:', streamId);
                                 });
                                 mobileCall.on('close', function () {
                                     setLiveIndicator(false);
@@ -299,39 +354,70 @@
                                 });
                             }
                         });
-                        mobilePeer.on('error', function () {
+                        mobilePeer.on('error', function (err) {
+                            console.warn('PeerJS error:', err && (err.type || err.message));
                             if (!panicRetryTimer) panicRetryTimer = setInterval(tryCall, 3000);
                         });
                     } catch (e) {
+                        console.warn('startStreamToWarRoom catch:', e);
                         if (!panicRetryTimer) panicRetryTimer = setInterval(tryCall, 3000);
                     }
                 }
                 tryCall();
             }
 
-            // ——— Protocolo One-Touch: coords + alerta + streaming en cadena ———
-            function executeOneTouchPanic() {
+            // ——— startPanic: permiso de cámara INMEDIATAMENTE al presionar; luego coords + stream ———
+            function startPanic() {
+                setBeaconState(true);
                 panicBtn.classList.add('sent');
                 panicBtn.textContent = 'ENVIANDO…';
+
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    panicBtn.textContent = '¡PÁNICO!';
+                    panicBtn.classList.remove('sent');
+                    setBeaconState(false);
+                    alert('Cámara no disponible en este dispositivo.');
+                    return;
+                }
+
+                var streamDone = false;
+                var posDone = false;
+                function maybeFinish() {
+                    if (streamDone && posDone) {
+                        panicBtn.textContent = 'PÁNICO ENVIADO';
+                        setTimeout(function () {
+                            panicBtn.classList.remove('sent');
+                            panicBtn.textContent = '¡PÁNICO!';
+                        }, 3000);
+                    }
+                }
+
+                navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                    .then(function (stream) {
+                        mobileStream = stream;
+                        console.log('Stream iniciado con ID:', BEACON_ID);
+                        startStreamToWarRoom(stream);
+                        streamDone = true;
+                        maybeFinish();
+                    })
+                    .catch(function (err) {
+                        console.warn('getUserMedia error:', err);
+                        streamDone = true;
+                        maybeFinish();
+                        alert('Se necesita permiso de cámara para enviar video al War Room.');
+                    });
+
                 navigator.geolocation.getCurrentPosition(
                     function (pos) {
                         sendPanicToSupabase(pos).then(function () {
-                            panicBtn.textContent = 'PÁNICO ENVIADO';
-                            setTimeout(function () {
-                                panicBtn.classList.remove('sent');
-                                panicBtn.textContent = '¡PÁNICO!';
-                            }, 3000);
+                            posDone = true;
+                            maybeFinish();
                         });
-                        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                            navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(function (stream) {
-                                mobileStream = stream;
-                                startStreamToWarRoom(stream);
-                            }).catch(function () {});
-                        }
                     },
                     function (err) {
                         panicBtn.textContent = '¡PÁNICO!';
                         panicBtn.classList.remove('sent');
+                        setBeaconState(false);
                         alert('Necesitamos ubicación. Activa GPS y permite acceso.');
                     },
                     { enableHighAccuracy: true, timeout: 10000 }
@@ -343,11 +429,12 @@
                     alert('La cámara requiere HTTPS.');
                     return;
                 }
-                executeOneTouchPanic();
+                startPanic();
             });
 
             // ——— Control de zombies: desconectar y limpiar slot al cerrar o detener ———
             function cleanupCameraAndNotify() {
+                setBeaconState(false);
                 setLiveIndicator(false);
                 btnDetener.classList.remove('visible');
                 if (panicRetryTimer) { clearInterval(panicRetryTimer); panicRetryTimer = null; }
