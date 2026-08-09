@@ -3,11 +3,712 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Tech Sentinel — CORE Control Center</title>
-    <script>window.location.replace("dashboard.html");</script>
-    <meta http-equiv="refresh" content="0;url=dashboard.html">
+    <meta name="theme-color" content="#050508">
+    <meta name="description" content="Smart Tech Sentinel — Ingeniería de sistemas tácticos, SaaS verticales y plataformas de protección de grado operacional.">
+    <title>Smart Tech Sentinel — Portafolio Operacional</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-cyan: #00f2ff;
+            --neon-magenta: #ff2bd6;
+            --alert-red: #ff0040;
+            --neon-orange: #ff6600;
+            --bg-deep: #050508;
+            --bg-panel: #0a0a12;
+            --text-mute: #8a9bb0;
+            --grid-line: rgba(0, 242, 255, 0.06);
+            --glow-cyan: 0 0 24px rgba(0, 242, 255, 0.35);
+            --font-display: 'Orbitron', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            background: var(--bg-deep);
+            color: #e8f7ff;
+            font-family: var(--font-mono);
+            line-height: 1.55;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* Atmosphere: tactical grid + scan sweep */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+                radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0, 242, 255, 0.12), transparent 55%),
+                radial-gradient(ellipse 60% 40% at 90% 80%, rgba(255, 43, 214, 0.06), transparent 50%);
+            background-size: 48px 48px, 48px 48px, 100% 100%, 100% 100%;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent 0,
+                transparent 3px,
+                rgba(0, 80, 100, 0.035) 3px,
+                rgba(0, 80, 100, 0.035) 4px
+            );
+            background-size: 100% 140px;
+            animation: scan-fall 22s linear infinite;
+            mix-blend-mode: screen;
+            opacity: 0.45;
+        }
+
+        @keyframes scan-fall {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 140px; }
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.55; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.04); }
+        }
+
+        @keyframes fade-up {
+            from { opacity: 0; transform: translateY(28px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes border-breathe {
+            0%, 100% { box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.25), 0 0 18px rgba(0, 242, 255, 0.08); }
+            50% { box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.55), 0 0 28px rgba(0, 242, 255, 0.2); }
+        }
+
+        .wrap {
+            position: relative;
+            z-index: 2;
+        }
+
+        /* —— NAV —— */
+        .nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid rgba(0, 242, 255, 0.2);
+            background: rgba(5, 5, 8, 0.85);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .nav-brand {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 0.85rem;
+            letter-spacing: 0.12em;
+            color: var(--neon-cyan);
+            text-decoration: none;
+            text-transform: uppercase;
+        }
+
+        .nav-brand span { color: #fff; font-weight: 500; }
+
+        .nav-links {
+            display: flex;
+            gap: 1.25rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-mute);
+            text-decoration: none;
+            font-size: 0.72rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover { color: var(--neon-cyan); }
+
+        .nav-core {
+            font-size: 0.68rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--neon-cyan);
+            border: 1px solid var(--neon-cyan);
+            padding: 0.45rem 0.9rem;
+            text-decoration: none;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+
+        .nav-core:hover {
+            background: rgba(0, 242, 255, 0.1);
+            box-shadow: var(--glow-cyan);
+        }
+
+        /* —— HERO —— */
+        .hero {
+            min-height: min(100vh, 920px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 4rem 1.5rem 5rem;
+            max-width: 1100px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .hero-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.68rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--neon-cyan);
+            margin-bottom: 1.75rem;
+            animation: fade-up 0.7s ease both;
+        }
+
+        .hero-status .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--neon-cyan);
+            box-shadow: 0 0 10px var(--neon-cyan);
+            animation: pulse-glow 2.2s ease-in-out infinite;
+        }
+
+        .hero-brand {
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: clamp(2.4rem, 8vw, 4.6rem);
+            line-height: 1.05;
+            letter-spacing: 0.04em;
+            color: #fff;
+            text-transform: uppercase;
+            margin-bottom: 1.25rem;
+            animation: fade-up 0.8s 0.08s ease both;
+            text-shadow: 0 0 40px rgba(0, 242, 255, 0.25);
+        }
+
+        .hero-brand em {
+            font-style: normal;
+            color: var(--neon-cyan);
+            display: block;
+        }
+
+        .hero-lead {
+            max-width: 36rem;
+            color: var(--text-mute);
+            font-size: clamp(0.9rem, 2vw, 1.05rem);
+            margin-bottom: 2.25rem;
+            animation: fade-up 0.8s 0.16s ease both;
+        }
+
+        .hero-cta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.85rem;
+            animation: fade-up 0.8s 0.24s ease both;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            text-decoration: none;
+            padding: 0.85rem 1.35rem;
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            background: transparent;
+            cursor: pointer;
+            transition: background 0.2s, box-shadow 0.2s, color 0.2s, border-color 0.2s;
+        }
+
+        .btn:hover {
+            background: rgba(0, 242, 255, 0.12);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .btn-fill {
+            background: var(--neon-cyan);
+            color: #050508;
+        }
+
+        .btn-fill:hover {
+            background: #fff;
+            color: #050508;
+            border-color: #fff;
+            box-shadow: var(--glow-cyan);
+        }
+
+        .btn-magenta {
+            border-color: var(--neon-magenta);
+            color: var(--neon-magenta);
+        }
+
+        .btn-magenta:hover {
+            background: rgba(255, 43, 214, 0.12);
+            box-shadow: 0 0 22px rgba(255, 43, 214, 0.35);
+        }
+
+        .hero-visual {
+            position: absolute;
+            right: -4%;
+            top: 18%;
+            width: min(42vw, 420px);
+            aspect-ratio: 1;
+            pointer-events: none;
+            opacity: 0.55;
+            animation: fade-up 1s 0.3s ease both;
+        }
+
+        .hero-visual .ring {
+            position: absolute;
+            inset: 12%;
+            border: 1px solid rgba(0, 242, 255, 0.35);
+            border-radius: 50%;
+            animation: border-breathe 4s ease-in-out infinite;
+        }
+
+        .hero-visual .ring:nth-child(2) {
+            inset: 22%;
+            border-color: rgba(255, 43, 214, 0.25);
+            animation-delay: 0.6s;
+        }
+
+        .hero-visual .ring:nth-child(3) {
+            inset: 34%;
+            border-color: rgba(0, 242, 255, 0.5);
+            animation-delay: 1.2s;
+        }
+
+        .hero-visual .core {
+            position: absolute;
+            inset: 42%;
+            background: radial-gradient(circle, rgba(0, 242, 255, 0.5), transparent 70%);
+            border-radius: 50%;
+            animation: pulse-glow 3s ease-in-out infinite;
+        }
+
+        /* —— SECTIONS —— */
+        section {
+            padding: 5rem 1.5rem;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .section-label {
+            font-size: 0.68rem;
+            letter-spacing: 0.28em;
+            text-transform: uppercase;
+            color: var(--neon-magenta);
+            margin-bottom: 0.75rem;
+        }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-size: clamp(1.4rem, 4vw, 2rem);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #fff;
+            margin-bottom: 0.75rem;
+        }
+
+        .section-lead {
+            color: var(--text-mute);
+            max-width: 40rem;
+            margin-bottom: 2.5rem;
+            font-size: 0.9rem;
+        }
+
+        /* —— PROJECTS —— */
+        #proyectos {
+            border-top: 1px solid rgba(0, 242, 255, 0.15);
+        }
+
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .project-card {
+            background: linear-gradient(165deg, rgba(10, 14, 24, 0.95), rgba(5, 5, 10, 0.98));
+            border: 1px solid rgba(0, 242, 255, 0.22);
+            padding: 1.5rem 1.35rem 1.35rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+        }
+
+        .project-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--neon-cyan), transparent 70%);
+            opacity: 0.7;
+        }
+
+        .project-card:hover {
+            border-color: rgba(0, 242, 255, 0.55);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 30px rgba(0, 242, 255, 0.12);
+        }
+
+        .project-card[data-accent="magenta"]::before {
+            background: linear-gradient(90deg, var(--neon-magenta), transparent 70%);
+        }
+
+        .project-card[data-accent="orange"]::before {
+            background: linear-gradient(90deg, var(--neon-orange), transparent 70%);
+        }
+
+        .project-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.62rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--text-mute);
+        }
+
+        .project-meta .tag {
+            color: var(--neon-cyan);
+            border: 1px solid rgba(0, 242, 255, 0.35);
+            padding: 0.2rem 0.45rem;
+        }
+
+        .project-card[data-accent="magenta"] .project-meta .tag {
+            color: var(--neon-magenta);
+            border-color: rgba(255, 43, 214, 0.4);
+        }
+
+        .project-card[data-accent="orange"] .project-meta .tag {
+            color: var(--neon-orange);
+            border-color: rgba(255, 102, 0, 0.45);
+        }
+
+        .project-title {
+            font-family: var(--font-display);
+            font-size: 0.95rem;
+            letter-spacing: 0.06em;
+            line-height: 1.35;
+            text-transform: uppercase;
+            color: #fff;
+        }
+
+        .project-desc {
+            color: var(--text-mute);
+            font-size: 0.8rem;
+            flex: 1;
+        }
+
+        .project-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            margin-top: 0.5rem;
+        }
+
+        .project-actions .btn {
+            padding: 0.65rem 1rem;
+            font-size: 0.65rem;
+        }
+
+        /* —— CONTACT —— */
+        #contacto {
+            border-top: 1px solid rgba(0, 242, 255, 0.15);
+            padding-bottom: 6rem;
+        }
+
+        .contact-panel {
+            border: 1px solid rgba(0, 242, 255, 0.28);
+            background: rgba(10, 10, 18, 0.9);
+            padding: 1.75rem 1.5rem;
+            max-width: 560px;
+            animation: border-breathe 5s ease-in-out infinite;
+        }
+
+        .contact-panel form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .field label {
+            display: block;
+            font-size: 0.62rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--neon-cyan);
+            margin-bottom: 0.4rem;
+        }
+
+        .field input,
+        .field textarea {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.45);
+            border: 1px solid rgba(0, 242, 255, 0.25);
+            color: #e8f7ff;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            padding: 0.75rem 0.85rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .field input:focus,
+        .field textarea:focus {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.25), var(--glow-cyan);
+        }
+
+        .field textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .form-foot {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 0.35rem;
+        }
+
+        .form-hint {
+            font-size: 0.68rem;
+            color: var(--text-mute);
+            letter-spacing: 0.04em;
+        }
+
+        footer {
+            border-top: 1px solid rgba(0, 242, 255, 0.15);
+            padding: 1.25rem 1.5rem;
+            text-align: center;
+            font-size: 0.65rem;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--text-mute);
+        }
+
+        footer a {
+            color: var(--neon-cyan);
+            text-decoration: none;
+        }
+
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .hero-visual { display: none; }
+            .hero { min-height: auto; padding-top: 3rem; }
+        }
+    </style>
 </head>
 <body>
-    <p>Redirigiendo al CORE Control Center… <a href="dashboard.html">Ir al dashboard</a>.</p>
+<div class="wrap">
+    <nav class="nav" aria-label="Navegación principal">
+        <a class="nav-brand" href="#top">SMART TECH <span>SENTINEL</span></a>
+        <ul class="nav-links">
+            <li><a href="#proyectos">Proyectos</a></li>
+            <li><a href="#contacto">Contacto</a></li>
+        </ul>
+        <a class="nav-core" href="dashboard.html">CORE Access</a>
+    </nav>
+
+    <header class="hero" id="top">
+        <p class="hero-status"><span class="dot" aria-hidden="true"></span> Canal B2B // Sistemas en producción</p>
+        <h1 class="hero-brand">Smart Tech<em>Sentinel</em></h1>
+        <p class="hero-lead">
+            Ingeniería de plataformas tácticas y SaaS verticales para operaciones críticas:
+            protección animal, retail de estética y comando de seguridad privada.
+        </p>
+        <div class="hero-cta">
+            <a class="btn btn-fill" href="#proyectos">Ver arsenal</a>
+            <a class="btn" href="#contacto">Abrir canal seguro</a>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+            <div class="ring"></div>
+            <div class="ring"></div>
+            <div class="ring"></div>
+            <div class="core"></div>
+        </div>
+    </header>
+
+    <section id="proyectos" aria-labelledby="proyectos-title">
+        <p class="section-label">// Deployed assets</p>
+        <h2 class="section-title" id="proyectos-title">Proyectos</h2>
+        <p class="section-lead">
+            Tres líneas de producto reales, listas para briefing comercial y despliegue operacional.
+        </p>
+
+        <div class="projects-grid">
+            <!-- PROYECTO 1 -->
+            <article class="project-card" data-accent="cyan">
+                <div class="project-meta">
+                    <span>01 / FULLSTACK</span>
+                    <span class="tag">LIVE</span>
+                </div>
+                <h3 class="project-title">HONEY APP — Plataforma de Recuperación Animal &amp; Red de Protección</h3>
+                <p class="project-desc">
+                    Sistema fullstack móvil interactivo conectado a bases de datos dinámicas en la nube
+                    (Neon Postgres/Supabase) con foso defensivo visual contra fraude de registros.
+                </p>
+                <div class="project-actions">
+                    <a class="btn btn-fill" href="https://vercel.app" target="_blank" rel="noopener noreferrer">Ver Demo</a>
+                    <a class="btn" href="#contacto">Briefing</a>
+                </div>
+            </article>
+
+            <!-- PROYECTO 2 -->
+            <article class="project-card" data-accent="magenta">
+                <div class="project-meta">
+                    <span>02 / SAAS</span>
+                    <span class="tag">MODULAR</span>
+                </div>
+                <h3 class="project-title">BARBERQUOTA PRO — Vertical SaaS Modular Híbrido</h3>
+                <p class="project-desc">
+                    Ecosistema integral de gestión comercial para establecimientos de estética y academias
+                    de formación. Implementa un motor financiero para liquidación de comisiones del 50%
+                    y persistencia local SQLite para funcionamiento offline.
+                </p>
+                <div class="project-actions">
+                    <a class="btn btn-magenta" href="#contacto">Solicitar Demo</a>
+                </div>
+            </article>
+
+            <!-- PROYECTO 3 -->
+            <article class="project-card" data-accent="orange">
+                <div class="project-meta">
+                    <span>03 / WAR ROOM</span>
+                    <span class="tag">TACTICAL</span>
+                </div>
+                <h3 class="project-title">SENTINEL — Centro de Comando Táctico y Monitoreo de Riesgos</h3>
+                <p class="project-desc">
+                    Tablero operativo de grado militar (War Room) para corporaciones de seguridad privada
+                    internacional. Despliegue cartográfico reactivo asíncrono y geofencing de alertas perimetrales.
+                </p>
+                <div class="project-actions">
+                    <a class="btn btn-fill" href="dashboard.html">Ver Demo</a>
+                    <a class="btn" href="#contacto">Briefing</a>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <section id="contacto" aria-labelledby="contacto-title">
+        <p class="section-label">// Secure uplink</p>
+        <h2 class="section-title" id="contacto-title">Contact_System</h2>
+        <p class="section-lead">
+            Transmisión directa al canal WhatsApp. Completá los campos y el sistema genera el lead
+            con formato operacional listo para respuesta.
+        </p>
+
+        <div class="contact-panel">
+            <form id="Contact_System" name="Contact_System" novalidate>
+                <div class="field">
+                    <label for="User_Name">User_Name</label>
+                    <input type="text" id="User_Name" name="User_Name" autocomplete="name" required placeholder="Nombre / Organización">
+                </div>
+                <div class="field">
+                    <label for="User_Email">User_Email</label>
+                    <input type="email" id="User_Email" name="User_Email" autocomplete="email" required placeholder="email@empresa.com">
+                </div>
+                <div class="field">
+                    <label for="Transmission_Content">Transmission_Content</label>
+                    <textarea id="Transmission_Content" name="Transmission_Content" required placeholder="Objetivo, timeline, alcance del despliegue…"></textarea>
+                </div>
+                <div class="form-foot">
+                    <button type="submit" class="btn btn-fill">Enviar Mensaje</button>
+                    <span class="form-hint">Redirect → WhatsApp Lead Pipeline</span>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <footer>
+        Smart Tech Sentinel // Portafolio operacional &nbsp;·&nbsp;
+        <a href="dashboard.html">CORE Control Center</a>
+    </footer>
+</div>
+
+<script>
+(function () {
+    /**
+     * WhatsApp Lead Pipeline
+     * Opcional: número en formato internacional sin "+" (ej. 54911XXXXXXXX).
+     * Si queda vacío, WhatsApp abre con el texto prearmado para elegir el chat.
+     */
+    var WHATSAPP_PHONE = '';
+
+    function buildWhatsAppLeadUrl(userName, userEmail, transmissionContent) {
+        var message = [
+            '🚀_NUEVO_LEAD_DESDE_PORTAFOLIO',
+            '-----------------------------------',
+            'Nombre: ' + userName,
+            'Email: ' + userEmail,
+            'Mensaje: ' + transmissionContent
+        ].join('\n');
+
+        var params = new URLSearchParams();
+        params.set('text', message);
+        if (WHATSAPP_PHONE) {
+            params.set('phone', WHATSAPP_PHONE);
+        }
+
+        return 'https://api.whatsapp.com/send?' + params.toString();
+    }
+
+    function dispatchWhatsAppLead(event) {
+        event.preventDefault();
+
+        var nameEl = document.getElementById('User_Name');
+        var emailEl = document.getElementById('User_Email');
+        var contentEl = document.getElementById('Transmission_Content');
+
+        var userName = (nameEl && nameEl.value || '').trim();
+        var userEmail = (emailEl && emailEl.value || '').trim();
+        var transmissionContent = (contentEl && contentEl.value || '').trim();
+
+        if (!userName || !userEmail || !transmissionContent) {
+            if (!userName && nameEl) nameEl.focus();
+            else if (!userEmail && emailEl) emailEl.focus();
+            else if (contentEl) contentEl.focus();
+            return;
+        }
+
+        var cleanUrl = buildWhatsAppLeadUrl(userName, userEmail, transmissionContent);
+        window.location.href = cleanUrl;
+    }
+
+    var form = document.getElementById('Contact_System');
+    if (form) {
+        form.addEventListener('submit', dispatchWhatsAppLead);
+    }
+})();
+</script>
 </body>
 </html>
