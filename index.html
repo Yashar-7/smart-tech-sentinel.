@@ -354,15 +354,16 @@
             border-top: 1px solid rgba(0, 242, 255, 0.15);
         }
 
+        /* Equivalente Tailwind: grid grid-cols-1 md:grid-cols-2 gap-8 */
         .projects-grid {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 1.25rem;
+            grid-template-columns: 1fr;
+            gap: 2rem;
         }
 
-        @media (max-width: 768px) {
+        @media (min-width: 768px) {
             .projects-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
 
@@ -600,11 +601,11 @@
             Cuatro líneas de producto reales, listas para briefing comercial y despliegue operacional.
         </p>
 
-        <div class="projects-grid">
-            <!-- PROYECTO 01 — RECIÉN NACIDO ANIMAL -->
+        <div class="projects-grid grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- PROYECTO 01 — RECIÉN NACIDO ANIMAL (Mascotas) -->
             <article class="project-card" data-accent="cyan">
                 <div class="project-meta">
-                    <span>01 / MASCOTAS</span>
+                    <span>01 / RECIÉN NACIDO ANIMAL</span>
                     <span class="tag">LIVE</span>
                 </div>
                 <h3 class="project-title">HONEY APP — Plataforma de Recuperación Animal &amp; Red de Protección</h3>
@@ -618,10 +619,10 @@
                 </div>
             </article>
 
-            <!-- PROYECTO 02 — SHARP CUTS POS -->
+            <!-- PROYECTO 02 — SHARP CUTS POS (Barbería y Academia) -->
             <article class="project-card" data-accent="magenta">
                 <div class="project-meta">
-                    <span>02 / BARBERÍA</span>
+                    <span>02 / BARBERÍA &amp; ACADEMIA</span>
                     <span class="tag">LIVE</span>
                 </div>
                 <h3 class="project-title">SHARP CUTS POS — Ecosistema Híbrido de Gestión &amp; Academia</h3>
@@ -636,10 +637,10 @@
                 </div>
             </article>
 
-            <!-- PROYECTO 03 — SENTINEL -->
+            <!-- PROYECTO 03 — SENTINEL (Monitoreo Táctico Corporativo) -->
             <article class="project-card" data-accent="orange">
                 <div class="project-meta">
-                    <span>03 / WAR ROOM</span>
+                    <span>03 / MONITOREO TÁCTICO</span>
                     <span class="tag">TACTICAL</span>
                 </div>
                 <h3 class="project-title">SENTINEL — Centro de Comando Táctico y Monitoreo de Riesgos</h3>
@@ -653,10 +654,10 @@
                 </div>
             </article>
 
-            <!-- PROYECTO 04 — HONEY GESTIÓN -->
+            <!-- PROYECTO 04 — HONEY GESTIÓN (Trazabilidad de Almacén) -->
             <article class="project-card" data-accent="amber">
                 <div class="project-meta">
-                    <span>04 / CLOUD INVENTORIES</span>
+                    <span>04 / TRAZABILIDAD ALMACÉN</span>
                     <span class="tag">LIVE</span>
                 </div>
                 <h3 class="project-title">HONEY GESTIÓN — Sistema ERP de Almacén &amp; Control de Stock</h3>
@@ -666,7 +667,7 @@
                     y panel de reportes de rendimiento operativo.
                 </p>
                 <div class="project-actions">
-                    <a class="btn btn-amber" href="https://honey-gestion-stock.vercel.app" target="_blank" rel="noopener noreferrer">Ver Demo</a>
+                    <a class="btn btn-amber" href="https://honey-gestion-stock.vercel.app" target="_blank" rel="noopener noreferrer">Ver Demo Briefing</a>
                     <a class="btn" href="#contacto">Briefing</a>
                 </div>
             </article>
